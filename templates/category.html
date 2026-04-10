@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Pulse - {{ category.label }}{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="navbar-brand">
+        <div class="logo-icon">⚡</div>
+        <h1>Pulse</h1>
+    </div>
+</nav>
+
+<a href="{{ url_for('dashboard', month=current_month, year=current_year) }}" class="back-link">
+    ← Back to Dashboard
+</a>
+
+<!-- Category Header -->
+<div class="category-header">
+    <div class="category-header-icon" style="background: {{ category.color }}20;">
+        {{ category.icon }}
+    </div>
+    <div class="category-header-info">
+        <h2>{{ category.label }}</h2>
+        <div class="category-header-total">
+            {{ total | currency }} - {{ month_name }} {{ current_year }} · {{ transactions | length }} transactions
+        </div>
+    </div>
+</div>
+
+<!-- Transactions -->
+<div class="panel" style="max-width: 800px;">
+    <div class="panel-header">
+        <h3 class="panel-title">Transaction Details</h3>
+        <button class="btn btn-primary btn-sm" onclick="openModal('expense-modal')">+ Expense</button>
+    </div>
+
+    {% if transactions %}
+    <div class="transaction-list">
+        {% for tx in transactions %}
+        <div class="transaction-item">
+            <div class="transaction-icon" style="background: {{ category.color }}20;">
+                {{ category.icon }}
+            </div>
+            <div class="transaction-info">
+                <div class="transaction-desc">
+                    {{ tx.description }}
+                </div>
+                <div class="transaction-meta">
+                    {{ tx.date }}
+                    {% if tx.note %} · {{ tx.note }}{% endif %}
+                </div>
+            </div>
+            <div class="transaction-amount">-{{ tx.amount | currency }}</div>
+            <div class="transaction-actions">
+                <button class="btn btn-ghost btn-icon btn-sm" onclick="openEditModal({{ tx.id }})" title="Edit">✎</button>
+                <form action="{{ url_for('delete_expense', expense_id=tx.id) }}" method="POST" style="display: inline;"
+                      onsubmit="return confirm('Delete this transaction?')">
+                    <button type="submit" class="btn btn-danger btn-icon btn-sm" title="Delete">✕</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">📝</div>
+        <p>No transactions in this category yet.</p>
+        <button class="btn btn-primary" onclick="openModal('expense-modal')">+ Add Expense</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Expense Modal (pre-selected category) -->
+<div class="modal-overlay" id="expense-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add Expense</h2>
+            <button class="modal-close" onclick="closeModal('expense-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('add_expense') }}" method="POST">
+                <input type="hidden" name="category" id="expense-category" value="{{ category_id }}">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="category-select-grid">
+                        {% for cat in categories %}
+                        <label class="category-select-item {% if cat.id == category_id %}active{% endif %}"
+                               onclick="handleCategorySelection('{{ cat.id }}', this, 'expense-modal', 'expense-category')">
+                            <input type="radio" name="category_radio" value="{{ cat.id }}" {% if cat.id == category_id %}checked{% endif %}>
+                            <span class="cat-emoji">{{ cat.icon }}</span>
+                            {{ cat.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="expense-desc">Description</label>
+                    <input type="text" class="form-input" id="expense-desc" name="description" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="expense-amount">Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})</label>
+                        <input type="number" step="0.01" class="form-input" id="expense-amount" name="amount" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="expense-date">Date</label>
+                        <input type="date" class="form-input" id="expense-date" name="date">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="expense-note">Note (optional)</label>
+                    <textarea class="form-textarea" id="expense-note" name="note"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Save Expense
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Expense Modal -->
+<div class="modal-overlay" id="edit-expense-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Edit Expense</h2>
+            <button class="modal-close" onclick="closeModal('edit-expense-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-expense-form" method="POST">
+                <input type="hidden" name="category" id="edit-expense-category">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="category-select-grid" id="edit-category-grid">
+                        {% for cat in categories %}
+                        <label class="category-select-item"
+                               data-category="{{ cat.id }}"
+                               onclick="handleCategorySelection('{{ cat.id }}', this, 'edit-category-grid', 'edit-expense-category')">
+                            <input type="radio" name="edit_category_radio" value="{{ cat.id }}">
+                            <span class="cat-emoji">{{ cat.icon }}</span>
+                            {{ cat.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-expense-desc">Description</label>
+                    <input type="text" class="form-input" id="edit-expense-desc" name="description" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-expense-amount">Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})</label>
+                        <input type="number" step="0.01" class="form-input" id="edit-expense-amount" name="amount" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-expense-date">Date</label>
+                        <input type="date" class="form-input" id="edit-expense-date" name="date">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-expense-note">Note (optional)</label>
+                    <textarea class="form-textarea" id="edit-expense-note" name="note"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Update Expense
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/category.js') }}"></script>
+{% endblock %}

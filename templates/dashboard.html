@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+{% block title %}Pulse - Dashboard{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="navbar-brand">
+        <div class="logo-icon">⚡</div>
+        <h1>Pulse</h1>
+        <span class="tagline">Know your financial rhythm</span>
+    </div>
+    <div class="navbar-nav">
+        <a href="{{ url_for('export_csv') }}" class="btn btn-ghost btn-sm" style="margin-right: var(--space-sm);">📥 Export CSV</a>
+        <div class="month-selector">
+            <span style="font-size: 0.85rem;">📅</span>
+            <select id="month-select" onchange="navigateMonth()">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
+                    {{ month_names[m] }}
+                </option>
+                {% endfor %}
+            </select>
+            <select id="year-select" onchange="navigateMonth()">
+                {% for y in range(current_year - 2, current_year + 2) %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="currency-selector-container">
+            <div class="custom-select" id="currency-select-wrapper">
+                <div class="custom-select-trigger" onclick="toggleCurrencyDropdown()">
+                    {% if current_currency == 'USD' %}
+                        <svg class="flag-icon" viewBox="0 0 741 390"><path fill="#bd3d44" d="M0 0h741v30H0zM0 60h741v30H0zM0 120h741v30H0zM0 180h741v30H0zM0 240h741v30H0zM0 300h741v30H0zM0 360h741v30H0z"/><path fill="#fff" d="M0 30h741v30H0zM0 90h741v30H0zM0 150h741v30H0zM0 210h741v30H0zM0 270h741v30H0zM0 330h741v30H0z"/><path fill="#192f5d" d="M0 0h296.4v210H0z"/></svg>
+                        <span>USD ($)</span>
+                    {% elif current_currency == 'EUR' %}
+                        <svg class="flag-icon" viewBox="0 0 810 540"><path fill="#039" d="M0 0h810v540H0z"/><circle fill="#fc0" cx="405" cy="115" r="18"/><circle fill="#fc0" cx="405" cy="425" r="18"/><circle fill="#fc0" cx="260" cy="154" r="18"/><circle fill="#fc0" cx="550" cy="154" r="18"/><circle fill="#fc0" cx="260" cy="386" r="18"/><circle fill="#fc0" cx="550" cy="386" r="18"/><circle fill="#fc0" cx="171" cy="270" r="18"/><circle fill="#fc0" cx="639" cy="270" r="18"/><circle fill="#fc0" cx="199" cy="193" r="18"/><circle fill="#fc0" cx="611" cy="193" r="18"/><circle fill="#fc0" cx="199" cy="347" r="18"/><circle fill="#fc0" cx="611" cy="347" r="18"/></svg>
+                        <span>EUR (€)</span>
+                    {% else %}
+                        <svg class="flag-icon" viewBox="0 0 3 2"><rect width="3" height="2" fill="#fff"/><rect width="3" height="1" fill="#e70011"/></svg>
+                        <span>IDR (Rp)</span>
+                    {% endif %}
+                    <svg class="chevron-icon" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                </div>
+                <div class="custom-options">
+                    <div class="custom-option {% if current_currency == 'USD' %}selected{% endif %}" onclick="selectCurrency('USD')">
+                        <svg class="flag-icon" viewBox="0 0 741 390"><path fill="#bd3d44" d="M0 0h741v30H0zM0 60h741v30H0zM0 120h741v30H0zM0 180h741v30H0zM0 240h741v30H0zM0 300h741v30H0zM0 360h741v30H0z"/><path fill="#fff" d="M0 30h741v30H0zM0 90h741v30H0zM0 150h741v30H0zM0 210h741v30H0zM0 270h741v30H0zM0 330h741v30H0z"/><path fill="#192f5d" d="M0 0h296.4v210H0z"/></svg>
+                        USD ($)
+                    </div>
+                    <div class="custom-option {% if current_currency == 'EUR' %}selected{% endif %}" onclick="selectCurrency('EUR')">
+                        <svg class="flag-icon" viewBox="0 0 810 540"><path fill="#039" d="M0 0h810v540H0z"/><circle fill="#fc0" cx="405" cy="115" r="18"/><circle fill="#fc0" cx="405" cy="425" r="18"/><circle fill="#fc0" cx="260" cy="154" r="18"/><circle fill="#fc0" cx="550" cy="154" r="18"/><circle fill="#fc0" cx="260" cy="386" r="18"/><circle fill="#fc0" cx="550" cy="386" r="18"/><circle fill="#fc0" cx="171" cy="270" r="18"/><circle fill="#fc0" cx="639" cy="270" r="18"/><circle fill="#fc0" cx="199" cy="193" r="18"/><circle fill="#fc0" cx="611" cy="193" r="18"/><circle fill="#fc0" cx="199" cy="347" r="18"/><circle fill="#fc0" cx="611" cy="347" r="18"/></svg>
+                        EUR (€)
+                    </div>
+                    <div class="custom-option {% if current_currency == 'IDR' %}selected{% endif %}" onclick="selectCurrency('IDR')">
+                        <svg class="flag-icon" viewBox="0 0 3 2"><rect width="3" height="2" fill="#fff"/><rect width="3" height="1" fill="#e70011"/></svg>
+                        IDR (Rp)
+                    </div>
+                </div>
+            </div>
+            <form action="{{ url_for('update_currency') }}" method="POST" id="currency-form-hidden" style="display:none;">
+                <input type="hidden" name="currency" id="hidden-currency-input">
+            </form>
+            <span class="currency-info-small">Fixed: $1 = €0.86 = Rp17k</span>
+        </div>
+    </div>
+</nav>
+
+<!-- Summary Cards -->
+<div class="summary-grid">
+    <div class="summary-card" style="border-top: 3px solid var(--accent-primary);">
+        <div class="card-label">Total Net Worth</div>
+        <div class="card-amount">{{ net_worth | currency }}</div>
+        <div class="card-sub">All-time balance</div>
+    </div>
+    <div class="summary-card income">
+        <div class="card-label">Monthly Income</div>
+        <div class="card-amount">{{ total_income | currency }}</div>
+        <div class="card-sub" style="color: {% if mom_income >= 0 %}var(--success){% else %}var(--danger){% endif %};">
+            {% if mom_income > 0 %}↑{% elif mom_income < 0 %}↓{% else %}-{% endif %} {{ "%.1f" | format(mom_income|abs) }}% vs last mo
+        </div>
+    </div>
+    <div class="summary-card expense">
+        <div class="card-label">Monthly Expenses</div>
+        <div class="card-amount">{{ total_expense | currency }}</div>
+        <div class="card-sub" style="color: {% if mom_expense <= 0 %}var(--success){% else %}var(--danger){% endif %};">
+            {% if mom_expense > 0 %}↑{% elif mom_expense < 0 %}↓{% else %}-{% endif %} {{ "%.1f" | format(mom_expense|abs) }}% vs last mo
+        </div>
+    </div>
+    <div class="summary-card balance">
+        <div class="card-label">Monthly Balance</div>
+        <div class="card-amount">{{ balance | currency }}</div>
+        <div class="card-sub">
+            {% if total_income > 0 %}
+                {{ "%.0f" | format((total_expense / total_income) * 100) }}% of income used
+            {% else %}
+                No income data
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Pulse Intelligence -->
+{% if financial_score or insights %}
+<div class="content-grid full-width">
+    <div class="panel" style="border-color: var(--accent-primary); box-shadow: 0 0 20px rgba(167, 139, 250, 0.1);">
+        <div class="panel-header" style="margin-bottom: var(--space-sm);">
+            <h3 class="panel-title" style="display: flex; align-items: center; gap: var(--space-sm);">
+                <span style="font-size: 1.2rem;">✨</span> Pulse Intelligence
+            </h3>
+            {% if financial_score %}
+            <div class="panel-badge" style="font-size: 0.85rem;">Financial Score: {{ financial_score.score }}/100</div>
+            {% endif %}
+        </div>
+        <div style="display: flex; flex-direction: column; gap: var(--space-sm);">
+            {% if financial_score and financial_score.insights %}
+                {% for insight in financial_score.insights %}
+                <div style="background: rgba(167, 139, 250, 0.1); border-left: 3px solid var(--accent-primary); padding: var(--space-sm) var(--space-md); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.85rem;">
+                    💡 {{ insight }}
+                </div>
+                {% endfor %}
+            {% endif %}
+            {% if insights %}
+                {% for insight in insights %}
+                <div style="background: {% if insight.type == 'alert' %}var(--danger-bg){% elif insight.type == 'warning' %}var(--warning-bg){% elif insight.type == 'success' %}var(--success-bg){% else %}var(--bg-elevated){% endif %}; 
+                            border-left: 3px solid {% if insight.type == 'alert' %}var(--danger){% elif insight.type == 'warning' %}var(--warning){% elif insight.type == 'success' %}var(--success){% else %}var(--border-color){% endif %}; 
+                            padding: var(--space-sm) var(--space-md); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 0.85rem;">
+                    {{ insight.icon }} <strong>{{ insight.title }}</strong>: {{ insight.message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        {% if financial_score %}
+        <div style="display: flex; gap: var(--space-md); margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-color);">
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Needs (50%)</div>
+                <div style="font-weight: 600; color: {% if financial_score.needs.pct > 50 %}var(--danger){% else %}var(--success){% endif %};">{{ "%.1f" | format(financial_score.needs.pct) }}%</div>
+            </div>
+            <div style="flex: 1; text-align: center; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color);">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Wants (30%)</div>
+                <div style="font-weight: 600; color: {% if financial_score.wants.pct > 30 %}var(--danger){% else %}var(--success){% endif %};">{{ "%.1f" | format(financial_score.wants.pct) }}%</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Savings (20%)</div>
+                <div style="font-weight: 600; color: {% if financial_score.savings.pct < 20 %}var(--danger){% else %}var(--success){% endif %};">{{ "%.1f" | format(financial_score.savings.pct) }}%</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Cashflow Sankey -->
+<div class="content-grid full-width">
+    <div class="panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Cashflow Flow</h3>
+            <span class="panel-badge">{{ month_name }}</span>
+        </div>
+        {% if sankey_data %}
+        <div class="sankey-mobile-flow">
+            <div class="sankey-node">
+                <span class="node-icon">💰</span>
+                <span class="node-label">Income</span>
+                <span class="node-value">{{ total_income | currency }}</span>
+            </div>
+            <div class="sankey-arrow">➜</div>
+            <div class="sankey-node-group">
+                <div class="sankey-node expense">
+                    <span class="node-icon">💸</span>
+                    <span class="node-label">Spending</span>
+                    <span class="node-value">{{ total_expense | currency }}</span>
+                </div>
+                <div class="sankey-node savings">
+                    <span class="node-icon">🏦</span>
+                    <span class="node-label">Savings</span>
+                    <span class="node-value">{{ balance | currency }}</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <p>No cashflow to visualize this month.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Trend Chart -->
+<div class="content-grid full-width">
+    <div class="panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Spending Trend</h3>
+            <span class="panel-badge">6 Months</span>
+        </div>
+        {% if trend_labels %}
+        <div class="chart-container" style="max-width: 100%; height: 300px; aspect-ratio: auto;">
+            <canvas id="trend-chart"></canvas>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📈</div>
+            <p>No historical data to show trends.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Drafts Inbox (For Telegram / OCR Integration) -->
+{% if drafts %}
+<div class="content-grid full-width">
+    <div class="panel" style="border-color: var(--accent-primary); box-shadow: var(--shadow-glow);">
+        <div class="panel-header">
+            <h3 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2rem;">📥</span> Unreviewed Drafts
+            </h3>
+            <span class="panel-badge" style="background: var(--warning-bg); color: var(--warning);">{{ drafts|length }} Pending</span>
+        </div>
+        <div class="transaction-list">
+            {% for draft in drafts %}
+            {% set cat = category_map.get(draft.category, {"label": "Uncategorized", "icon": "❓", "color": "#B2BEC3"}) %}
+            <div class="transaction-item" style="background: var(--bg-elevated); border: 1px dashed var(--border-color);">
+                <div class="transaction-icon" style="background: {{ cat.color }}20;">
+                    {{ cat.icon }}
+                </div>
+                <div class="transaction-info">
+                    <div class="transaction-desc">
+                        {{ draft.description }}
+                        <span style="font-size: 0.6rem; background: var(--bg-card); padding: 2px 6px; border-radius: 10px; margin-left: 6px;">{{ draft.source }}</span>
+                    </div>
+                    <div class="transaction-meta">{{ draft.date }} · Suggested: {{ cat.label }}</div>
+                </div>
+                
+                <form action="{{ url_for('approve_draft', draft_id=draft.id) }}" method="POST" style="display: flex; align-items: center; gap: var(--space-md);">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <select name="category" class="form-input" style="padding: 4px 8px; font-size: 0.75rem; min-width: 120px;">
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if category.id == draft.category %}selected{% endif %}>
+                                {{ category.icon }} {{ category.label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="amount" value="{{ draft.amount_display }}" class="form-input" style="padding: 4px 8px; font-size: 0.85rem; width: 100px; font-weight: 600; color: var(--danger);">
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">Approve</button>
+                    </div>
+                </form>
+                
+                <form action="{{ url_for('reject_draft', draft_id=draft.id) }}" method="POST" onsubmit="return confirm('Reject this draft?')">
+                    <button type="submit" class="btn btn-danger btn-icon btn-sm" title="Reject">✕</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Main Content -->
+<div class="content-grid">
+    <!-- Pie Chart -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Expense Distribution</h3>
+            <span class="panel-badge">{{ month_name }}</span>
+        </div>
+        {% if category_details %}
+        <div class="chart-container">
+            <canvas id="expense-chart"></canvas>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <p>No expense data for this month.</p>
+            <button class="btn btn-primary" onclick="openModal('expense-modal')">+ Add Expense</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Categories Breakdown -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3 class="panel-title">By Category</h3>
+            <button class="btn btn-primary btn-sm" onclick="openModal('expense-modal')">+ Expense</button>
+        </div>
+        {% if category_details %}
+        <div class="category-list">
+            {% for cat in category_details %}
+            <a href="{{ url_for('category_detail', category_id=cat.id, month=current_month, year=current_year) }}" class="category-item">
+                <div class="category-icon" style="background: {{ cat.color }}20;">
+                    {{ cat.icon }}
+                </div>
+                <div class="category-info">
+                    <div class="category-name">{{ cat.label }}</div>
+                    <div class="category-count">{{ cat.count }} transactions</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="category-amount">{{ cat.total | currency }}</div>
+                    <div class="category-percentage">{{ "%.1f" | format(cat.percentage) }}%</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📂</div>
+            <p>Start tracking your expenses.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Income & Recent Transactions -->
+<div class="content-grid">
+    <!-- Income -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Income</h3>
+            <button class="btn btn-primary btn-sm" onclick="openModal('income-modal')">+ Income</button>
+        </div>
+        {% if income_entries %}
+        <div class="income-list">
+            {% for entry in income_entries %}
+            <div class="income-item">
+                <div>
+                    <div class="income-source">{{ entry.source }}</div>
+                    {% if entry.note %}
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">{{ entry.note }}</div>
+                    {% endif %}
+                </div>
+                <div style="display: flex; align-items: center; gap: var(--space-md);">
+                    <div class="income-amount">{{ entry.amount | currency }}</div>
+                    <div class="income-actions">
+                        <form action="{{ url_for('delete_income', income_id=entry.id) }}" method="POST" style="display: inline;"
+                              onsubmit="return confirm('Delete this income?')">
+                            <button type="submit" class="btn btn-danger btn-icon btn-sm" title="Delete">✕</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">💰</div>
+            <p>No income for this month.</p>
+            <button class="btn btn-primary" onclick="openModal('income-modal')">+ Add Income</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3 class="panel-title">Recent Transactions</h3>
+            <span class="panel-badge">ALL</span>
+        </div>
+        {% if recent_transactions %}
+        <div class="transaction-list">
+            {% for tx in recent_transactions %}
+            {% set cat = category_map.get(tx.category, {"label": tx.category, "icon": "📦", "color": "#B2BEC3"}) %}
+            <div class="transaction-item">
+                <div class="transaction-icon" style="background: {{ cat.color }}20;">
+                    {{ cat.icon }}
+                </div>
+                <div class="transaction-info">
+                    <div class="transaction-desc">
+                        {{ tx.description }}
+                        {% if tx.is_anomaly %}
+                        <span style="font-size: 0.6rem; background: var(--danger); color: white; padding: 2px 6px; border-radius: 10px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.05em; font-weight: 700;">SPIKE DETECTED</span>
+                        {% endif %}
+                    </div>
+                    <div class="transaction-meta">{{ cat.label }} · {{ tx.date }}</div>
+                </div>
+                <div class="transaction-amount">-{{ tx.amount | currency }}</div>
+                <div class="transaction-actions">
+                    <button class="btn btn-ghost btn-icon btn-sm" onclick="openEditModal({{ tx.id }})" title="Edit">✎</button>
+                    <form action="{{ url_for('delete_expense', expense_id=tx.id) }}" method="POST" style="display: inline;"
+                          onsubmit="return confirm('Delete this transaction?')">
+                        <button type="submit" class="btn btn-danger btn-icon btn-sm" title="Delete">✕</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p>No transactions yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Expense Modal -->
+<div class="modal-overlay" id="expense-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add Expense</h2>
+            <button class="modal-close" onclick="closeModal('expense-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('add_expense') }}" method="POST" id="expense-form">
+                <input type="hidden" name="category" id="expense-category" value="food">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="category-select-grid">
+                        {% for cat in categories %}
+                        <label class="category-select-item {% if loop.first %}active{% endif %}"
+                               onclick="handleCategorySelection('{{ cat.id }}', this, 'expense-modal', 'expense-category')">
+                            <input type="radio" name="category_radio" value="{{ cat.id }}" {% if loop.first %}checked{% endif %}>
+                            <span class="cat-emoji">{{ cat.icon }}</span>
+                            {{ cat.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="expense-desc">Description</label>
+                    <input type="text" class="form-input" id="expense-desc" name="description" placeholder="e.g. Lunch out, Uber ride..." required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="expense-amount">Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})</label>
+                        <input type="number" step="0.01" class="form-input" id="expense-amount" name="amount" placeholder="0.00" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="expense-date">Date</label>
+                        <input type="date" class="form-input" id="expense-date" name="date" value="{{ '%04d-%02d-%02d' | format(current_year, current_month, 1) }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="expense-note">Note (optional)</label>
+                    <textarea class="form-textarea" id="expense-note" name="note" placeholder="Add details..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Save Expense
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Expense Modal -->
+<div class="modal-overlay" id="edit-expense-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Edit Expense</h2>
+            <button class="modal-close" onclick="closeModal('edit-expense-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-expense-form" method="POST">
+                <input type="hidden" name="category" id="edit-expense-category">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="category-select-grid" id="edit-category-grid">
+                        {% for cat in categories %}
+                        <label class="category-select-item"
+                               data-category="{{ cat.id }}"
+                               onclick="handleCategorySelection('{{ cat.id }}', this, 'edit-category-grid', 'edit-expense-category')">
+                            <input type="radio" name="edit_category_radio" value="{{ cat.id }}">
+                            <span class="cat-emoji">{{ cat.icon }}</span>
+                            {{ cat.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-expense-desc">Description</label>
+                    <input type="text" class="form-input" id="edit-expense-desc" name="description" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-expense-amount">Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})</label>
+                        <input type="number" step="0.01" class="form-input" id="edit-expense-amount" name="amount" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-expense-date">Date</label>
+                        <input type="date" class="form-input" id="edit-expense-date" name="date">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-expense-note">Note (optional)</label>
+                    <textarea class="form-textarea" id="edit-expense-note" name="note"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Update Expense
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Income Modal -->
+<div class="modal-overlay" id="income-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add Income</h2>
+            <button class="modal-close" onclick="closeModal('income-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('add_income') }}" method="POST">
+                <input type="hidden" name="month" value="{{ current_month }}">
+                <input type="hidden" name="year" value="{{ current_year }}">
+
+                <div class="form-group">
+                    <label class="form-label" for="income-source">Source</label>
+                    <input type="text" class="form-input" id="income-source" name="source" value="Salary" placeholder="e.g. Salary, Freelance...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="income-amount">Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})</label>
+                    <input type="number" step="0.01" class="form-input" id="income-amount" name="amount" placeholder="0.00" min="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="income-note">Note (optional)</label>
+                    <textarea class="form-textarea" id="income-note" name="note" placeholder="Add details..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Save Income
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.PULSE_CONFIG = {
+        currentCurrency: "{{ current_currency }}",
+        {% if chart_labels %}
+        chartLabels: {{ chart_labels | tojson }},
+        chartAmounts: {{ chart_amounts | tojson }},
+        chartColors: {{ chart_colors | tojson }},
+        {% endif %}
+        {% if trend_labels %}
+        trendLabels: {{ trend_labels | tojson }},
+        trendIncome: {{ trend_income | tojson }},
+        trendExpense: {{ trend_expense | tojson }},
+        {% endif %}
+    };
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
