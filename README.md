@@ -4,6 +4,14 @@
 
 Pulse is a proactive personal finance application that goes beyond passive tracking. It actively learns your spending patterns, detects anomalies, and forecasts future trends to give you complete control over your financial health.
 
+![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square)
+![Flask](https://img.shields.io/badge/Flask-3.1-green?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-orange?style=flat-square)
+![SQLite](https://img.shields.io/badge/SQLite-3.41-blue?style=flat-square)
+![Chart.js](https://img.shields.io/badge/Chart.js-4.4-blue?style=flat-square)
+
+---
+
 ## Key Upgrades in Pulse
 
 -   **Multi-Currency Engine**: Full support for **USD ($)**, **EUR (€)**, and **IDR (Rp)**. All data is stored in a USD base for consistency, with dynamic conversion and localized formatting for both display and input.
@@ -11,6 +19,8 @@ Pulse is a proactive personal finance application that goes beyond passive track
 -   **6-Month Spending Trend**: A high-fidelity line chart to visualize Income vs. Expense history, helping you track your saving rate over half a year.
 -   **Local Intelligence (Categorization)**: A keyword-based engine that automatically suggests categories (Food, Health, Transport, etc.) for incoming transactions without needing external APIs.
 -   **Premium "Teal Forest" Aesthetic**: A refined UI/UX using a tailored "Teal Forest & Vanilla Latte" color palette, custom SVG icons, and smooth interactive components.
+
+---
 
 ## Portfolio Write-up
 
@@ -24,13 +34,17 @@ We injected an Intelligence Layer using classical statistical models to make fin
 -   **Z-Score Anomaly Detection**: Automatically flags transactions where $Z > 2.0$ as "Spikes," alerting the user to investigate unusual activity.
 -   **50/30/20 Rule Engine**: Real-time measurement of *Needs*, *Wants*, and *Savings* with a dynamic financial health score.
 
-## 🛠️ Tech Stack
+---
+
+## Tech Stack
 
 -   **Backend**: Python / Flask (Restful API Ready)
 -   **Database**: SQLite (Row-factory optimized, PRAGMA foreign keys)
 -   **Frontend**: HTML5, Vanilla CSS3 (Custom Design System with Variables), Vanilla JS
 -   **Visualization**: Chart.js (Line & Doughnut distributions)
 -   **Intelligence**: Standard Deviation / Z-Score Anomaly Detection, Linear Regression Forecasting
+
+---
 
 ## Getting Started
 
