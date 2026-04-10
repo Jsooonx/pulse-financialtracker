@@ -18,11 +18,16 @@ def seed():
     cursor.execute("DELETE FROM expense")
 
     # --- Income Data (4 months) ---
-    today = date.today()
+    today = date(2026, 4, 9)
     months = []
     for i in range(4):
-        d = today.replace(day=1) - timedelta(days=30 * i)
-        months.append((d.month, d.year))
+        # Calculate month/year for current and past 3 months
+        m = today.month - i
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        months.append((m, y))
 
     income_sources = [
         ("Salary", 5000),
@@ -39,6 +44,7 @@ def seed():
             )
 
     # --- Expense Data ---
+    # ... [expense_templates and category_weights remain the same] ...
     expense_templates = {
         "food": [
             ("Lunch with colleagues", 15, 30),
@@ -101,7 +107,6 @@ def seed():
         ],
     }
 
-    # Category frequency weights
     category_weights = {
         "food": (15, 25),
         "transport": (8, 15),
@@ -117,8 +122,18 @@ def seed():
         if month == 12:
             days_in_month = 31
         else:
-            next_month = date(year + (month // 12), (month % 12) + 1, 1)
-            days_in_month = (next_month - timedelta(days=1)).day
+            # Simple month end calculation
+            if month == 2:
+                days_in_month = 28 # Simplified
+            elif month in [4, 6, 9, 11]:
+                days_in_month = 30
+            else:
+                days_in_month = 31
+
+        # Adjust max day if we are in the current month/year
+        max_day = days_in_month
+        if month == today.month and year == today.year:
+            max_day = today.day
 
         for category, templates in expense_templates.items():
             min_count, max_count = category_weights[category]
@@ -128,7 +143,7 @@ def seed():
                 template = random.choice(templates)
                 desc, min_amt, max_amt = template
                 amount = random.randint(min_amt, max_amt)
-                day = random.randint(1, days_in_month)
+                day = random.randint(1, max_day)
                 expense_date = date(year, month, day).isoformat()
 
                 cursor.execute(
@@ -139,16 +154,16 @@ def seed():
     conn.commit()
     conn.close()
 
-    print("✅ Seed data successfully added!")
-    print(f"   📅 {len(months)} months of data")
+    print("Seed data successfully added!")
+    print(f" {len(months)} months of data")
 
     # Print summary
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     income_count = cursor.execute("SELECT COUNT(*) FROM income").fetchone()[0]
     expense_count = cursor.execute("SELECT COUNT(*) FROM expense").fetchone()[0]
-    print(f"   💰 {income_count} income entries")
-    print(f"   💸 {expense_count} expense entries")
+    print(f" Income: {income_count} entries")
+    print(f" Expenses: {expense_count} entries")
     conn.close()
 
 
