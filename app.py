@@ -593,21 +593,37 @@ def api_get_expense(expense_id):
 @app.route("/api/webhook/telegram", methods=["POST"])
 def telegram_webhook():
     """
-    Webhook endpoint to receive parsed transaction data from a Telegram bot.
-    Expects JSON data: { "amount": 15.5, "description": "Starbucks Coffee", "source": "telegram" }
+    Webhook endpoint to receive transaction data from a Telegram bot.
+    Supports:
+    1. Parsed data: { "amount": 15.5, "description": "Starbucks Coffee", "source": "telegram" }
+    2. Raw text: { "text": "25000 Starbucks", "source": "telegram" }
     """
     data = request.json
-    if not data or "amount" not in data or "description" not in data:
-        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+    if not data:
+        return jsonify({"status": "error", "message": "No data provided"}), 400
+
+    source = data.get("source", "telegram")
+    tx_date = data.get("date", date.today().isoformat())
 
     try:
-        amount = float(data["amount"])
-        description = data["description"].strip()
-        source = data.get("source", "telegram")
-        tx_date = data.get("date", date.today().isoformat())
-
-        # Auto-categorize using intelligence layer
-        category = intelligence.categorize_transaction(description)
+        # Case 1: Raw text input (Natural Language)
+        if "text" in data:
+            parsed = intelligence.parse_telegram_message(data["text"])
+            if not parsed:
+                return jsonify({"status": "error", "message": "Could not parse text"}), 400
+            
+            amount = parsed["amount"]
+            description = parsed["description"]
+            category = parsed["category"]
+        
+        # Case 2: Already parsed fields
+        elif "amount" in data and "description" in data:
+            amount = float(data["amount"])
+            description = data["description"].strip()
+            category = data.get("category") or intelligence.categorize_transaction(description)
+        
+        else:
+            return jsonify({"status": "error", "message": "Missing amount/description or text"}), 400
 
         conn = get_db()
         conn.execute(
@@ -617,7 +633,7 @@ def telegram_webhook():
         conn.commit()
         conn.close()
 
-        return jsonify({"status": "success", "message": "Draft saved successfully"}), 201
+        return jsonify({"status": "success", "message": "Draft saved successfully", "parsed": {"amount": amount, "description": description, "category": category}}), 201
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

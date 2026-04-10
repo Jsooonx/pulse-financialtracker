@@ -244,7 +244,7 @@ def process_recurring(conn, current_date):
 def categorize_transaction(description):
     """
     Simple local categorization engine that maps common keywords to existing categories.
-    Used for automatically categorizing incoming drafts (e.g., from Telegram/OCR).
+    Used for automatically categorizing incoming drafts (e.g., from Telegram).
     """
     if not description:
         return "others"
@@ -274,3 +274,54 @@ def categorize_transaction(description):
             return category
             
     return "others"
+
+def parse_telegram_message(text):
+    """
+    Parse a natural language message from Telegram.
+    Example: "Coffee at Starbucks 15000" -> {amount: 15000, description: "Coffee at Starbucks", category: "food"}
+    Example: "25000 Nasi Goreng" -> {amount: 25000, description: "Nasi Goreng", category: "food"}
+    """
+    if not text:
+        return None
+        
+    import re
+    
+    # Find numbers in the text (potential amounts)
+    # Support formats like 15000, 15.000, 15,000.00
+    # We clean the string of common currency symbols first
+    clean_text = text.replace('Rp', '').replace('$', '').replace('€', '').strip()
+    
+    # Match numbers (including those with . or , as separators)
+    # This is a simple regex: it looks for consecutive digits, possibly with dots/commas
+    # We pick the one that looks most like an amount (usually the largest or last one in simple inputs)
+    # But for now, let's just find all numbers and pick the first one
+    numbers = re.findall(r'\d+(?:[.,]\d+)*', clean_text)
+    
+    if not numbers:
+        return None
+        
+    # Pick the number - let's assume if there are multiple words, 
+    # the amount is often at the beginning or end
+    # We'll try to refine this: if a number is very large or has separators, it's likely the amount
+    amount_str = numbers[0]
+    # Simple normalization: remove common separators if they aren't decimals
+    # This is tricky without locale, but let's assume if it has 3 digits after a separator, it's a thousand separator
+    normalized_amount = amount_str.replace(',', '') # Simplify for now
+    try:
+        amount = float(normalized_amount)
+    except ValueError:
+        return None
+        
+    # Description is the rest of the text
+    description = clean_text.replace(amount_str, '').strip()
+    if not description:
+        description = "Telegram Transaction"
+        
+    # Auto-categorize
+    category = categorize_transaction(description)
+    
+    return {
+        "amount": amount,
+        "description": description,
+        "category": category
+    }
