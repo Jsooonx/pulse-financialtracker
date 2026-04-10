@@ -12,6 +12,10 @@ Pulse is a proactive personal finance application that goes beyond passive track
 
 ---
 
+![Pulse Dashboard](static/images/landingpage.png)
+
+---
+
 ## ⚡ Hosting & Free Tier Limitations
 
 Pulse is designed to be highly interactive, especially with its **Telegram Bot (Pulsar)**. Running a bot 24/7 requires a continuous background process (polling).
@@ -86,6 +90,11 @@ python bot.py
 - `/add [desc] [amount] [currency]` — Quick log (e.g., `/add coffee 5 usd`).
 - `/summary` — Get your current monthly financial overview.
 - `/insight` — Real-time Pulse Intelligence report.
+
+### Bot Previews
+| Start / Help | Add Expense | Summary | Intelligence |
+| :---: | :---: | :---: | :---: |
+| ![Start](static/images/start.png) | ![Add](static/images/add.png) | ![Summary](static/images/summary.png) | ![Insight](static/images/insight.png) |
 
 ---
 *Created by Jsooonx for Portfolio | 2026*
