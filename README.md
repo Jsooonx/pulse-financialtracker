@@ -76,6 +76,7 @@ python bot.py
 
 ## ✨ Key Features
 
+- **Monthly Budgeting & Proactive Alerts**: Set month-specific spending targets for each category. Pulse keeps track and proactively warns you via Telegram when you reach 80% or 100% of your budget.
 - **Multi-Currency Engine**: Full support for **USD ($)**, **EUR (€)**, and **IDR (Rp)**. All data is stored in a USD base for consistency.
 - **Drafts Inbox (Telegram Text)**: A built-in staging area for incoming transactions. Send messages like `"Starbucks 25k idr"` to your bot and approve them in the dashboard.
 - **6-Month Spending Trend**: High-fidelity visualization of your Income vs. Expense history.
@@ -86,10 +87,14 @@ python bot.py
 
 ## 🤖 Telegram Bot (Pulsar) Commands
 
-- `/start` — Introduction and help.
-- `/add [desc] [amount] [currency]` — Quick log (e.g., `/add coffee 5 usd`).
-- `/summary` — Get your current monthly financial overview.
-- `/insight` — Real-time Pulse Intelligence report.
+- `/start` - Introduction and help.
+- `/add [desc] [amount] [currency]` - Quick log (e.g., `/add coffee 5 usd`).
+- `/summary` - Monthly financial overview with budget progress bars.
+- `/history` - View the last 10 transactions.
+- `/undo` - Remove the very last transaction added.
+- `/setbudget [category] [amount] [currency]` - Set a monthly spending target.
+- `/insight` - Real-time Pulse Intelligence report.
+- `/clearbudget [category]` - Remove a specific budget. Call without arguments to see all active budgets.
 
 ### Bot Previews
 | Start / Help | Add Expense | Summary | Intelligence |

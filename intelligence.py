@@ -253,14 +253,15 @@ def categorize_transaction(description):
     
     # Keyword mapping based on EXPENSE_CATEGORIES
     mappings = {
-        "food": ["restaurant", "cafe", "coffee", "mcdonald", "kfc", "starbucks", "lunch", "dinner", "breakfast", "grocery", "market", "food", "supermarket", "walmart", "target", "indomaret", "alfamart"],
-        "transport": ["uber", "lyft", "taxi", "gas", "petrol", "shell", "chevron", "parking", "train", "subway", "bus", "flight", "airline", "gojek", "grab", "pertamina"],
-        "bills": ["electric", "water", "internet", "phone", "comcast", "att", "verizon", "rent", "mortgage", "insurance", "subscription", "netflix", "spotify", "gym", "pln", "telkomsel", "indihome"],
-        "entertainment": ["movie", "cinema", "game", "steam", "nintendo", "playstation", "ticket", "concert", "museum", "club", "xxi", "cgv"],
-        "shopping": ["amazon", "clothing", "shoes", "mall", "apple", "best buy", "electronics", "book", "tokopedia", "shopee"],
-        "health": ["pharmacy", "cvs", "walgreens", "hospital", "doctor", "dentist", "clinic", "medicine", "therapy", "apotek"],
-        "education": ["tuition", "school", "college", "university", "course", "udemy", "coursera", "bookstore"],
+        'food': ['eating', 'food', 'lunch', 'dinner', 'breakfast', 'makan', 'snack', 'coffee', 'drink', 'restaurant', 'cafe', 'mcdonald', 'kfc', 'starbucks', 'burger', 'pizza', 'rice', 'boba', 'warung', 'grocery', 'supermarket', 'mart', 'indomaret', 'alfamart', 'bakery', 'steak', 'walmart', 'target'],
+        'transport': ['transport', 'grab', 'gojek', 'taxi', 'bus', 'fuel', 'gas', 'petrol', 'parking', 'parkir', 'uber', 'lyft', 'train', 'subway', 'flight', 'plane', 'airline', 'mrt', 'lrt', 'krl', 'toll', 'bensin', 'pertamina', 'shell', 'chevron', 'ride', 'commute'],
+        'shopping': ['shopping', 'clothes', 'clothing', 'shirt', 'shoes', 'buy', 'beli', 'amazon', 'mall', 'outfit', 'tech', 'gadget', 'laptop', 'phone', 'apple', 'best buy', 'tokopedia', 'tokped', 'shopee', 'lazada', 'skincare', 'makeup', 'electronics'],
+        'entertainment': ['entertainment', 'movie', 'game', 'netflix', 'spotify', 'cinema', 'xxi', 'cgv', 'ticket', 'concert', 'trip', 'holiday', 'vacation', 'steam', 'xbox', 'playstation', 'nintendo', 'disney', 'youtube', 'hbogo', 'hobby', 'museum', 'club'],
+        'health': ['health', 'medicine', 'doctor', 'gym', 'pharmacy', 'hospital', 'clinic', 'dentist', 'vet', 'apotek', 'skincare', 'fitness', 'workout', 'medical', 'supplement', 'vitamin', 'spa', 'massage', 'therapy', 'cvs', 'walgreens'],
+        'bills': ['bills', 'electricity', 'electric', 'water', 'internet', 'phone', 'rent', 'wifi', 'data', 'credit', 'telkomsel', 'pln', 'pdam', 'insurance', 'subscription', 'membership', 'icloud', 'tax', 'laundry', 'maintenance', 'comcast', 'att', 'verizon', 'mortgage', 'indihome'],
+        'education': ['education', 'school', 'college', 'university', 'tuition', 'course', 'udemy', 'coursera', 'bootcamp', 'bookstore', 'book'],
     }
+
     
     # Check exact word matches first for better accuracy
     words = set(desc_lower.replace('-', ' ').replace('_', ' ').split())

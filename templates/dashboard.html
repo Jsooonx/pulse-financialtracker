@@ -282,23 +282,41 @@
     <div class="panel">
         <div class="panel-header">
             <h3 class="panel-title">By Category</h3>
-            <button class="btn btn-primary btn-sm" onclick="openModal('expense-modal')">+ Expense</button>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-ghost btn-sm" onclick="openModal('budget-modal')">🎯 Budgets</button>
+                <button class="btn btn-primary btn-sm" onclick="openModal('expense-modal')">+ Expense</button>
+            </div>
         </div>
         {% if category_details %}
         <div class="category-list">
             {% for cat in category_details %}
             <a href="{{ url_for('category_detail', category_id=cat.id, month=current_month, year=current_year) }}" class="category-item">
-                <div class="category-icon" style="background: {{ cat.color }}20;">
-                    {{ cat.icon }}
+                <div style="display: flex; align-items: center; width: 100%; margin-bottom: 8px;">
+                    <div class="category-icon" style="background: {{ cat.color }}20;">
+                        {{ cat.icon }}
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">{{ cat.label }}</div>
+                        <div class="category-count">{{ cat.count }} transactions</div>
+                    </div>
+                    <div style="text-align: right; margin-left: auto;">
+                        <div class="category-amount">{{ cat.total | currency }}</div>
+                        <div class="category-percentage">{{ "%.1f" | format(cat.percentage) }}% of total</div>
+                    </div>
                 </div>
-                <div class="category-info">
-                    <div class="category-name">{{ cat.label }}</div>
-                    <div class="category-count">{{ cat.count }} transactions</div>
+                
+                {% if cat.budget > 0 %}
+                <div class="budget-progress-container">
+                    <div class="budget-progress-bar-bg">
+                        <div class="budget-progress-bar-fill {% if cat.budget_usage_pct >= 100 %}over-budget{% elif cat.budget_usage_pct >= 80 %}near-budget{% endif %}" 
+                             style="width: {{ [cat.budget_usage_pct, 100]|min }}%;"></div>
+                    </div>
+                    <div class="budget-meta">
+                        <span>{{ (cat.budget - cat.total) | currency }} remaining</span>
+                        <span>{{ "%.0f" | format(cat.budget_usage_pct) }}% of {{ cat.budget | currency }}</span>
+                    </div>
                 </div>
-                <div style="text-align: right;">
-                    <div class="category-amount">{{ cat.total | currency }}</div>
-                    <div class="category-percentage">{{ "%.1f" | format(cat.percentage) }}%</div>
-                </div>
+                {% endif %}
             </a>
             {% endfor %}
         </div>
@@ -354,7 +372,7 @@
     <div class="panel">
         <div class="panel-header">
             <h3 class="panel-title">Recent Transactions</h3>
-            <span class="panel-badge">ALL</span>
+            <a href="{{ url_for('all_transactions', month=current_month, year=current_year) }}" class="panel-badge clickable">ALL</a>
         </div>
         {% if recent_transactions %}
         <div class="transaction-list">
@@ -533,6 +551,60 @@
                     Save Income
                 </button>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Budgets Modal -->
+<div class="modal-overlay" id="budget-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Monthly Budgets</h2>
+            <button class="modal-close" onclick="closeModal('budget-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: var(--space-md);">
+                Set spending targets for {{ month_name }} {{ current_year }}. Unset categories default to no limit.
+            </p>
+            <div class="budget-setup-list" style="display: flex; flex-direction: column; gap: var(--space-md); max-height: 60vh; overflow-y: auto; padding-right: 8px;">
+                {% for cat in categories %}
+                {% set existing_budget = budget_map.get(cat.id, 0) %}
+                <form action="{{ url_for('upsert_budget') }}" method="POST" class="budget-form-row" style="display: flex; align-items: center; gap: var(--space-md); padding-bottom: var(--space-md); border-bottom: 1px solid var(--border-color);">
+                    <input type="hidden" name="category" value="{{ cat.id }}">
+                    <input type="hidden" name="month" value="{{ current_month }}">
+                    <input type="hidden" name="year" value="{{ current_year }}">
+                    
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 140px;">
+                        <span style="font-size: 1.2rem;">{{ cat.icon }}</span>
+                        <div style="display: flex; flex-direction: column; overflow: hidden;">
+                            <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap;">{{ cat.label }}</span>
+                            {% if existing_budget > 0 %}
+                            <span style="font-size: 0.7rem; color: var(--success); font-weight: 500;">Set: {{ existing_budget | currency }}</span>
+                            {% else %}
+                            <span style="font-size: 0.65rem; color: var(--text-muted);">No limit set</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">{% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %}</span>
+                        <input type="number" step="0.01" name="amount" value="{{ (existing_budget * currency_rates[current_currency]) | round(2) if existing_budget > 0 else '' }}" 
+                               class="form-input" style="padding: 6px 10px; font-size: 0.85rem;" placeholder="0.00">
+                    </div>
+                    
+                    <div style="display: flex; gap: 4px;">
+                        <button type="submit" class="btn btn-ghost btn-sm" style="padding: 6px 10px;">Apply</button>
+                        {% if existing_budget > 0 %}
+                        <button type="button" class="btn btn-danger btn-sm" style="padding: 6px 10px;" title="Clear Budget" 
+                                onclick="this.closest('form').querySelector('input[name=amount]').value='0'; this.closest('form').submit();">✕</button>
+                        {% endif %}
+                    </div>
+                </form>
+                {% endfor %}
+            </div>
+            <div style="margin-top: var(--space-lg); text-align: center;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('budget-modal')">Done Reading</button>
+            </div>
         </div>
     </div>
 </div>

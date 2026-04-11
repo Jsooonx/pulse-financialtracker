@@ -247,19 +247,34 @@ def dashboard():
     currency = get_setting("currency", "USD")
     rate = CURRENCY_RATES.get(currency, 1.0)
 
+    # Fetch budgets for this period
+    budget_rows = conn.execute(
+        "SELECT category, amount FROM budget WHERE month = ? AND year = ?",
+        (current_month, current_year)
+    ).fetchall()
+    budget_map = {b["category"]: b["amount"] for b in budget_rows}
+
     for row in categories_data:
-        cat = CATEGORY_MAP.get(row["category"], {"label": row["category"], "icon": "📦", "color": "#B2BEC3"})
-        chart_labels.append(cat["label"])
+        cat_id = row["category"]
+        cat_config = CATEGORY_MAP.get(cat_id, {"label": cat_id, "icon": "📦", "color": "#B2BEC3"})
+        
+        budget_amt = budget_map.get(cat_id, 0)
+        budget_usage_pct = (row["total"] / budget_amt * 100) if budget_amt > 0 else 0
+        
+        chart_labels.append(cat_config["label"])
         chart_amounts.append(row["total"] * rate)
-        chart_colors.append(cat["color"])
+        chart_colors.append(cat_config["color"])
+        
         category_details.append({
-            "id": row["category"],
-            "label": cat["label"],
-            "icon": cat["icon"],
-            "color": cat["color"],
+            "id": cat_id,
+            "label": cat_config["label"],
+            "icon": cat_config["icon"],
+            "color": cat_config["color"],
             "total": row["total"],
             "count": row["count"],
             "percentage": (row["total"] / total_expense * 100) if total_expense > 0 else 0,
+            "budget": budget_amt,
+            "budget_usage_pct": budget_usage_pct
         })
 
     # Available months for navigation
@@ -374,8 +389,41 @@ def dashboard():
         trend_income=trend_income,
         trend_expense=trend_expense,
         drafts=processed_drafts,
-        current_currency=get_setting("currency", "USD")
+        current_currency=get_setting("currency", "USD"),
+        budgets=budget_rows,
+        budget_map=budget_map,
+        currency_rates=CURRENCY_RATES
     )
+
+
+@app.route("/budget/upsert", methods=["POST"])
+def upsert_budget():
+    """Create or update a monthly budget for a category."""
+    category = request.form.get("category", "").strip()
+    amount = request.form.get("amount", type=float)
+    month = request.form.get("month", type=int)
+    year = request.form.get("year", type=int)
+
+    if not category or amount is None:
+        flash("Category and amount are required.", "error")
+        return redirect(url_for("dashboard", month=month, year=year))
+
+    # Convert to USD base
+    currency = get_setting("currency", "USD")
+    rate = CURRENCY_RATES.get(currency, 1.0)
+    usd_amount = amount / rate
+
+    conn = get_db()
+    conn.execute(
+        """INSERT INTO budget (category, amount, month, year) VALUES (?, ?, ?, ?)
+           ON CONFLICT(category, month, year) DO UPDATE SET amount = EXCLUDED.amount""",
+        (category, usd_amount, month, year),
+    )
+    conn.commit()
+    conn.close()
+
+    flash(f"Budget updated for {category.title()}!", "success")
+    return redirect(url_for("dashboard", month=month, year=year))
 
 
 @app.route("/settings/currency", methods=["POST"])
@@ -417,13 +465,13 @@ def add_income():
         conn.commit()
         flash("Income added successfully!", "success")
     except sqlite3.IntegrityError:
-        # Update existing
+        # User requested additive behavior
         conn.execute(
-            "UPDATE income SET amount = ?, note = ? WHERE source = ? AND month = ? AND year = ?",
+            "UPDATE income SET amount = amount + ?, note = COALESCE(note, '') || '\n' || ? WHERE source = ? AND month = ? AND year = ?",
             (usd_amount, note, source, month, year),
         )
         conn.commit()
-        flash("Income updated successfully!", "success")
+        flash("Income added to existing total successfully!", "success")
     finally:
         conn.close()
 
@@ -563,6 +611,49 @@ def category_detail(category_id):
         "category.html",
         category=cat,
         category_id=category_id,
+        transactions=transactions,
+        total=total,
+        current_month=current_month,
+        current_year=current_year,
+        month_name=month_names[current_month],
+        categories=EXPENSE_CATEGORIES,
+        category_map=CATEGORY_MAP,
+        current_currency=get_setting("currency", "USD")
+    )
+
+
+# --- All Transactions ---
+@app.route("/transactions")
+def all_transactions():
+    """View all transactions for a specific month/year."""
+    conn = get_db()
+
+    now = date.today()
+    current_month = request.args.get("month", now.month, type=int)
+    current_year = request.args.get("year", now.year, type=int)
+
+    transactions = conn.execute(
+        """SELECT * FROM expense
+           WHERE strftime('%m', date) = ? AND strftime('%Y', date) = ?
+           ORDER BY date DESC, created_at DESC""",
+        (f"{current_month:02d}", str(current_year)),
+    ).fetchall()
+
+    total = conn.execute(
+        """SELECT COALESCE(SUM(amount), 0) as total FROM expense
+           WHERE strftime('%m', date) = ? AND strftime('%Y', date) = ?""",
+        (f"{current_month:02d}", str(current_year)),
+    ).fetchone()["total"]
+
+    conn.close()
+
+    month_names = [
+        "", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]
+
+    return render_template(
+        "transactions.html",
         transactions=transactions,
         total=total,
         current_month=current_month,

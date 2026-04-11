@@ -394,6 +394,17 @@ a:hover {
     background: var(--accent-glow);
     color: var(--accent-primary);
     letter-spacing: 0.05em;
+    transition: all var(--transition-fast);
+}
+
+.panel-badge.clickable {
+    cursor: pointer;
+}
+
+.panel-badge.clickable:hover {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    transform: translateY(-1px);
 }
 
 /* === Chart Container === */
@@ -1186,4 +1197,53 @@ input[name="category_radio"] {
     text-align: right;
     letter-spacing: 0.02em;
     display: block;
+}
+
+/* === Budget Progress Bar === */
+.budget-progress-container {
+    margin-top: var(--space-sm);
+    width: 100%;
+}
+
+.budget-progress-bar-bg {
+    width: 100%;
+    height: 4px;
+    background: var(--border-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.budget-progress-bar-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 4px;
+    transition: width var(--transition-slow);
+}
+
+.budget-progress-bar-fill.near-budget {
+    background: var(--warning);
+}
+
+.budget-progress-bar-fill.over-budget {
+    background: var(--danger);
+}
+
+.budget-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+.budget-meta span:first-child {
+    font-weight: 500;
+}
+
+.near-budget-text {
+    color: var(--warning) !important;
+}
+
+.over-budget-text {
+    color: var(--danger) !important;
 }
