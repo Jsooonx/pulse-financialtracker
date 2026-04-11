@@ -96,10 +96,23 @@ python bot.py
 - `/insight` - Real-time Pulse Intelligence report.
 - `/clearbudget [category]` - Remove a specific budget. Call without arguments to see all active budgets.
 
-### Bot Previews
-| Start / Help | Add Expense | Summary | Intelligence |
-| :---: | :---: | :---: | :---: |
-| ![Start](static/images/start.png) | ![Add](static/images/add.png) | ![Summary](static/images/summary.png) | ![Insight](static/images/insight.png) |
+### 🤖 Bot Previews
+| Start / Help | Add Expense | Income Log |
+| :---: | :---: | :---: |
+| ![Start](static/images/start.png) | ![Add](static/images/add.png) | ![Income](static/images/income.png) |
+
+| Summary | History | Intelligence |
+| :---: | :---: | :---: |
+| ![Summary](static/images/summary.png) | ![History](static/images/history.png) | ![Insight](static/images/insight.png) |
+
+### 🌐 Web Dashboard Previews
+| Budgeting Modal | Currency Settings |
+| :---: | :---: |
+| ![Budgets](static/images/web_budgets.png) | ![Currency](static/images/web_currency.png) |
+
+| Transaction Form | Income Management |
+| :---: | :---: |
+| ![Expense](static/images/web_expense.png) | ![Income](static/images/web_income.png) |
 
 ---
 *Created by Jsooonx for Portfolio | 2026*
