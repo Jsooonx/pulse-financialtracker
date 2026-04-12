@@ -10,7 +10,15 @@
         <span class="tagline">Know your financial rhythm</span>
     </div>
     <div class="navbar-nav">
-        <a href="{{ url_for('export_csv') }}" class="btn btn-ghost btn-sm" style="margin-right: var(--space-sm);">📥 Export CSV</a>
+        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+            <div style="display: flex; gap: var(--space-md); align-items: center;">
+                <a href="{{ url_for('export_excel') }}" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0d9488, #10b981); border: none; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);">📊 Export Excel</a>
+                <a href="{{ url_for('export_csv') }}" class="btn btn-ghost btn-sm">📥 Export CSV</a>
+            </div>
+            <div style="font-size: 0.62rem; color: var(--text-muted); margin-top: 4px; font-style: italic; opacity: 0.8;">
+                Excel: Styled Report &nbsp; | &nbsp; CSV: Raw Data
+            </div>
+        </div>
         <div class="month-selector">
             <span style="font-size: 0.85rem;">📅</span>
             <select id="month-select" onchange="navigateMonth()">

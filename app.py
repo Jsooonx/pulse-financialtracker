@@ -1,6 +1,8 @@
 """Pulse — Personal Finance Intelligence Web App."""
 
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_file, Response
+import pandas as pd
+from io import BytesIO, StringIO
 import sqlite3
 import os
 from datetime import datetime, date
@@ -798,6 +800,120 @@ def export_csv():
         output,
         mimetype="text/csv",
         headers={"Content-disposition": "attachment; filename=pulse_export.csv"}
+    )
+
+
+@app.route("/export/excel")
+def export_excel():
+    """Export all expenses and income to a professionally styled Excel format."""
+    conn = get_db()
+    expenses = conn.execute("SELECT date, category, description, amount, note FROM expense ORDER BY date DESC").fetchall()
+    income = conn.execute("SELECT source, amount, month, year, note, created_at FROM income ORDER BY year DESC, month DESC").fetchall()
+    conn.close()
+
+    # Convert to DataFrames
+    df_expenses = pd.DataFrame([dict(row) for row in expenses])
+    df_income = pd.DataFrame([dict(row) for row in income])
+
+    # Human-readable column names and basic cleanup
+    if not df_expenses.empty:
+        df_expenses.columns = [col.title() for col in df_expenses.columns]
+    if not df_income.empty:
+        df_income.columns = [col.replace('_', ' ').title() for col in df_income.columns]
+
+    # Create Excel object in memory
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    
+    # Write sheets
+    df_expenses.to_excel(writer, sheet_name='Expenses', index=False)
+    df_income.to_excel(writer, sheet_name='Income', index=False)
+
+    # Get workbook/worksheet objects for styling
+    workbook = writer.book
+    
+    # STYLE DEFINITIONS
+    header_style = workbook.add_format({
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'vcenter',
+        'align': 'center',
+        'fg_color': '#0D9488', # Teal 600
+        'font_color': '#FFFFFF',
+        'border': 1,
+        'font_size': 11
+    })
+    
+    amount_style = workbook.add_format({
+        'num_format': '#,##0.00',
+        'align': 'right',
+        'border': 1,
+        'valign': 'vcenter'
+    })
+    
+    date_style = workbook.add_format({
+        'num_format': 'yyyy-mm-dd',
+        'align': 'center',
+        'border': 1,
+        'valign': 'vcenter'
+    })
+    
+    base_style = workbook.add_format({
+        'border': 1,
+        'valign': 'vcenter'
+    })
+    
+    stripe_style = workbook.add_format({
+        'border': 1,
+        'valign': 'vcenter',
+        'fg_color': '#F8FAFC' # Slate 50
+    })
+
+    def apply_professional_styling(worksheet, df):
+        if df.empty:
+            return
+            
+        # Apply header styling
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_style)
+        
+        # Apply zebra stripes and borders to data rows
+        for row_num in range(1, len(df) + 1):
+            row_format = stripe_style if row_num % 2 == 0 else base_style
+            for col_num in range(len(df.columns)):
+                # We write the value again with the format
+                val = df.iloc[row_num-1, col_num]
+                
+                # Special cases for column types
+                col_name = df.columns[col_num].lower()
+                if 'amount' in col_name:
+                    worksheet.write(row_num, col_num, val, amount_style if row_num % 2 != 0 else workbook.add_format({'num_format': '#,##0.00', 'align': 'right', 'border': 1, 'valign': 'vcenter', 'fg_color': '#F8FAFC'}))
+                elif 'date' in col_name or 'created at' in col_name:
+                    worksheet.write(row_num, col_num, val, date_style if row_num % 2 != 0 else workbook.add_format({'num_format': 'yyyy-mm-dd', 'align': 'center', 'border': 1, 'valign': 'vcenter', 'fg_color': '#F8FAFC'}))
+                else:
+                    worksheet.write(row_num, col_num, val, row_format)
+
+        # Auto-adjust column width
+        for i, col in enumerate(df.columns):
+            max_len = max(
+                df[col].astype(str).map(len).max() if not df[col].empty else 0,
+                len(col)
+            ) + 2
+            worksheet.set_column(i, i, min(max_len, 60))
+
+    apply_professional_styling(writer.sheets['Expenses'], df_expenses)
+    apply_professional_styling(writer.sheets['Income'], df_income)
+
+    writer.close()
+    output.seek(0)
+
+    filename = f"Pulse_Financial_Report_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
 if __name__ == "__main__":

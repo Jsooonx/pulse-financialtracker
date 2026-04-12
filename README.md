@@ -81,6 +81,7 @@ python bot.py
 - **Drafts Inbox (Telegram Text)**: A built-in staging area for incoming transactions. Send messages like `"Starbucks 25k idr"` to your bot and approve them in the dashboard.
 - **6-Month Spending Trend**: High-fidelity visualization of your Income vs. Expense history.
 - **Local Intelligence**: Natural language parsing that extracts amounts and categories automatically without external APIs.
+- **Professional Reporting**: Export your data to **Excel (.xlsx)** for a beautifully styled report with headers, zebra stripes, and auto-formatting, or to **CSV** for raw data processing.
 - **Premium Aesthetic**: A bespoke "Teal Forest & Vanilla Latte" UI/UX designed for modern financial management.
 
 ---
