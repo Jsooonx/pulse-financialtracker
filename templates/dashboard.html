@@ -299,7 +299,7 @@
         <div class="category-list">
             {% for cat in category_details %}
             <a href="{{ url_for('category_detail', category_id=cat.id, month=current_month, year=current_year) }}" class="category-item">
-                <div style="display: flex; align-items: center; width: 100%; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; width: 100%; margin-bottom: 8px; gap: var(--space-md);">
                     <div class="category-icon" style="background: {{ cat.color }}20;">
                         {{ cat.icon }}
                     </div>

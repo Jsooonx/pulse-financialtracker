@@ -37,7 +37,7 @@
     {% if transactions %}
     <div class="transaction-list">
         {% for tx in transactions %}
-        <div class="transaction-item">
+        <div class="transaction-item" style="display: flex; align-items: center; gap: var(--space-md);">
             <div class="transaction-icon" style="background: {{ category.color }}20;">
                 {{ category.icon }}
             </div>
