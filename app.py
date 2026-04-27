@@ -1,4 +1,4 @@
-"""Pulse — Personal Finance Intelligence Web App."""
+"""Pulse - Personal Finance Intelligence Web App."""
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_file, Response
 import pandas as pd
@@ -761,7 +761,7 @@ def telegram_webhook():
 def api_parse_text():
     """
     Parse raw text (bank email, SMS, or free text) and return extracted fields.
-    Does NOT save to DB — returns parsed result for UI preview.
+    Does NOT save to DB - returns parsed result for UI preview.
 
     Body: { "text": "<raw text>" }
     Response: { "amount": 180000, "description": "Alfacell", "date": "2026-04-24",

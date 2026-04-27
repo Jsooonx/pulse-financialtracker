@@ -114,11 +114,11 @@ def parse_transaction_parts(tokens):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "⚡ *Welcome to Pulsar* — Pulse Finance Intelligence\n\n"
+        "⚡ *Welcome to Pulsar* - Pulse Finance Intelligence\n\n"
         "📝 *Record Transactions*\n"
-        "• `/add [desc] [amt] [curr]` — Log expense\n"
+        "• `/add [desc] [amt] [curr]` - Log expense\n"
         "  _e.g. `/add Starbucks 55k idr`_\n"
-        "• `/income [src] [amt] [curr]` — Log income\n"
+        "• `/income [src] [amt] [curr]` - Log income\n"
         "  _e.g. `/income Salary 5000 usd`_\n\n"
 
         "🏦 *Smart Parse (NEW!)*\n"
@@ -126,20 +126,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Works with: BCA myBCA, or any format containing *Total Bayar*.\n\n"
 
         "🔁 *Recurring Rules (NEW!)*\n"
-        "• `/recurring` — List all recurring rules\n"
-        "• `/addrecurring [desc] [amt] [curr] [day]` — Add auto-expense\n"
+        "• `/recurring` - List all recurring rules\n"
+        "• `/addrecurring [desc] [amt] [curr] [day]` - Add auto-expense\n"
         "  _e.g. `/addrecurring Netflix 180k idr 1`_\n"
-        "• `/delrecurring [id]` — Delete a rule by ID\n\n"
+        "• `/delrecurring [id]` - Delete a rule by ID\n\n"
 
         "📊 *Analysis*\n"
-        "• `/summary` — Monthly balance + budget bars\n"
-        "• `/insight` — Financial score + 50/30/20\n"
-        "• `/history` — Last 10 transactions\n\n"
+        "• `/summary` - Monthly balance + budget bars\n"
+        "• `/insight` - Financial score + 50/30/20\n"
+        "• `/history` - Last 10 transactions\n\n"
 
         "⚙️ *Manage*\n"
-        "• `/undo` — Delete last expense\n"
-        "• `/setbudget [cat] [amt] [curr]` — Set spending limit\n"
-        "• `/clearbudget [cat?]` — View / clear budgets\n\n"
+        "• `/undo` - Delete last expense\n"
+        "• `/setbudget [cat] [amt] [curr]` - Set spending limit\n"
+        "• `/clearbudget [cat?]` - View / clear budgets\n\n"
 
         "💡 *Tip:* Type anything with a number (e.g. `lunch 25000`) and I will parse it automatically!"
     )
@@ -234,7 +234,7 @@ async def insight(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if savings_pct >= 20:
         msg += "\n✅ You're on track with your savings goal!"
     else:
-        msg += "\n⚠️ Savings below 20% — consider cutting discretionary spending."
+        msg += "\n⚠️ Savings below 20% - consider cutting discretionary spending."
 
     await update.message.reply_text(msg, parse_mode='Markdown')
 
@@ -577,7 +577,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📅 Date: {tx_date}\n"
             f"🏷️ Category: {category}\n"
             f"🔖 Type: {tx_type}\n\n"
-            f"✅ Saved as *Draft* — review it on the dashboard to approve.",
+            f"✅ Saved as *Draft* - review it on the dashboard to approve.",
             parse_mode='Markdown'
         )
         return
@@ -616,7 +616,7 @@ async def send_monthly_summary(context: ContextTypes.DEFAULT_TYPE):
     balance = income - expenses
     await context.bot.send_message(
         chat_id=chat_id,
-        text=f"📅 *Monthly Wrap-up — {now.strftime('%B %Y')}*\n\n"
+        text=f"📅 *Monthly Wrap-up - {now.strftime('%B %Y')}*\n\n"
              f"💰 Income: `${income:,.2f}`\n"
              f"💸 Expenses: `${expenses:,.2f}`\n"
              f"✅ Balance: `${balance:,.2f}`",

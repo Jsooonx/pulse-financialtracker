@@ -274,12 +274,14 @@
             <h3 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 1.1rem;">📋</span>
                 Smart Paste
-                <span style="font-size: 0.7rem; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--text-muted); margin-left: 4px;">— Paste bank email or SMS</span>
+                <span style="font-size: 0.7rem; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--text-muted); margin-left: 4px;">- Paste bank email or SMS</span>
             </h3>
             <span class="panel-badge" id="smart-paste-toggle-badge">▼ Expand</span>
         </div>
 
-        <div id="smart-paste-body" style="display: none;">
+        <div id="smart-paste-wrapper" class="collapsible-wrapper">
+            <div id="smart-paste-body" class="collapsible-content">
+
             <!-- Input Area -->
             <div class="form-group" style="margin-bottom: var(--space-md);">
                 <label class="form-label" for="smart-paste-input">Paste notification text</label>
@@ -714,11 +716,10 @@
 let _spParsed = null; // holds last successful parse result
 
 function toggleSmartPaste() {
-    const body = document.getElementById('smart-paste-body');
+    const wrapper = document.getElementById('smart-paste-wrapper');
     const badge = document.getElementById('smart-paste-toggle-badge');
-    const isHidden = body.style.display === 'none';
-    body.style.display = isHidden ? 'block' : 'none';
-    badge.textContent = isHidden ? '▲ Collapse' : '▼ Expand';
+    const isExpanded = wrapper.classList.toggle('expanded');
+    badge.textContent = isExpanded ? '▲ Collapse' : '▼ Expand';
 }
 
 async function smartParse() {

@@ -435,7 +435,7 @@ def parse_bank_email(text):
     is_english    = any(m in text_lower for m in en_markers)
 
     if not is_indonesian and not is_english:
-        return None  # Not a bank notification — let caller use parse_telegram_message
+        return None  # Not a bank notification - let caller use parse_telegram_message
 
     detected_currency = 'IDR' if is_indonesian else 'USD'  # default; refined below
 
@@ -460,7 +460,7 @@ def parse_bank_email(text):
         r'(?:IDR|Rp)\.?\s*([\d]{3,}(?:[,\.][\d]+)*)',  # any IDR amount as fallback
     ]
 
-    # English amount patterns — each captures (symbol_hint, digits)
+    # English amount patterns - each captures (symbol_hint, digits)
     en_amount_patterns = [
         # "a transaction of USD 12.50"
         r'(?:transaction|payment|amount|charged?|debited?)\s+of\s+(?:USD|GBP|EUR|SGD|AUD)?\s*([\d,\.]+)',
@@ -530,9 +530,9 @@ def parse_bank_email(text):
         r'[Bb]eneficiary\s*:\s*(.+)',
         r'[Ss]tore\s*:\s*(.+)',
         r'[Vv]endor\s*:\s*(.+)',
-        # Generic: "at <Merchant>" — works inline (no newline needed)
+        # Generic: "at <Merchant>" - works inline (no newline needed)
         r'(?:at|@)\s+([A-Z][A-Za-z0-9 &\'\-\.]{2,40})(?=\s*(?:was|on|[,\.\n\r]|$))',
-        # PayPal: "to email@domain" — use domain as vendor
+        # PayPal: "to email@domain" - use domain as vendor
         r'(?:to|sent\s+to)\s+([\w\.\-]+@[\w\.]+)',
     ]
     for pat in vendor_patterns:

@@ -1379,3 +1379,30 @@ input[name="category_radio"] {
     }
 }
 
+/* === Collapsible Utility (Modern Grid Animation) === */
+.collapsible-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.collapsible-wrapper.expanded {
+    grid-template-rows: 1fr;
+}
+
+.collapsible-content {
+    min-height: 0;
+    visibility: hidden;
+    transition: visibility 0.35s;
+}
+
+.collapsible-wrapper.expanded .collapsible-content {
+    visibility: visible;
+}
+
+/* Custom spacing for Smart Paste in expanded state */
+#smart-paste-body {
+    padding-top: var(--space-md);
+}
+
