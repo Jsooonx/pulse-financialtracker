@@ -1,14 +1,42 @@
 import os
+import sys
 import sqlite3
 import re
-from datetime import datetime
+from datetime import datetime, date
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
+# Import shared intelligence layer
+sys.path.insert(0, os.path.dirname(__file__))
+import intelligence
+
 load_dotenv()
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'pulse.db')
+
+CURRENCY_RATES = {'USD': 1.0, 'EUR': 0.86, 'IDR': 17000.0}
+
+def get_currency():
+    """Read currency setting from DB."""
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key='currency'").fetchone()
+        conn.close()
+        return row[0] if row else 'IDR'
+    except:
+        return 'IDR'
+
+def fmt(amount_usd):
+    """Format a USD-base amount in the user's display currency."""
+    curr = get_currency()
+    rate = CURRENCY_RATES.get(curr, 1.0)
+    val = amount_usd * rate
+    if curr == 'IDR':
+        return f"Rp{val:,.0f}"
+    elif curr == 'EUR':
+        return f"€{val:,.2f}"
+    return f"${val:,.2f}"
 
 def get_progress_bar(pct):
     """Generate a text-based progress bar."""
@@ -28,7 +56,7 @@ CATEGORY_KEYWORDS = {
 
 
 
-CURRENCY_RATES = {'idr': 1/17000, 'usd': 1, 'eur': 1.08}
+BOT_CURRENCY_RATES = {'idr': 1/17000, 'usd': 1, 'eur': 1.08}
 
 def get_db():
     return sqlite3.connect(DB_PATH)
@@ -62,7 +90,7 @@ def guess_category(description):
     return 'others'
 
 def convert_to_usd(amount, currency):
-    rate = CURRENCY_RATES.get(currency, 1)
+    rate = BOT_CURRENCY_RATES.get(currency, 1)
     return amount * rate
 
 def parse_transaction_parts(tokens):
@@ -86,27 +114,34 @@ def parse_transaction_parts(tokens):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
-        "⚡ *Welcome to Pulsar* — Your Pulse Finance Intelligence\n\n"
-        "I'm here to help you track and understand your financial rhythm. Here is how you can use me:\n\n"
-        
-        "📝 *Recording Transactions*\n"
-        "• `/add [desc] [amt] [curr]` - Log an expense\n"
-        "  _Ex: `/add Starbucks 55k idr`_\n"
-        "• `/income [src] [amt] [curr]` - Log income\n"
-        "  _Ex: `/income Salary 5000 usd`_\n\n"
-        
-        "📊 *Analysis & Overview*\n"
-        "• `/summary` - View this month's balance and budget progress bars.\n"
-        "• `/insight` - Get your Pulse financial score and 50/30/20 breakdown.\n"
-        "• `/history` - See your last 10 transactions.\n\n"
-        
-        "⚙️ *Management*\n"
-        "• `/undo` - Accidentally added something? Delete the very last entry.\n"
-        "• `/setbudget [cat] [amt] [curr]` - Set a monthly spending target.\n"
-        "  _Ex: `/setbudget food 200 usd`_\n"
-        "• `/clearbudget` - Manage your monthly spending targets.\n\n"
-        
-        "💡 *Tip:* You can also just type naturally like `'buy lunch 30k idr'` and I will try to understand it!"
+        "⚡ *Welcome to Pulsar* — Pulse Finance Intelligence\n\n"
+        "📝 *Record Transactions*\n"
+        "• `/add [desc] [amt] [curr]` — Log expense\n"
+        "  _e.g. `/add Starbucks 55k idr`_\n"
+        "• `/income [src] [amt] [curr]` — Log income\n"
+        "  _e.g. `/income Salary 5000 usd`_\n\n"
+
+        "🏦 *Smart Parse (NEW!)*\n"
+        "Just paste or forward your bank email / SMS notification and I will auto-extract the amount, vendor, date and category for you!\n"
+        "Works with: BCA myBCA, or any format containing *Total Bayar*.\n\n"
+
+        "🔁 *Recurring Rules (NEW!)*\n"
+        "• `/recurring` — List all recurring rules\n"
+        "• `/addrecurring [desc] [amt] [curr] [day]` — Add auto-expense\n"
+        "  _e.g. `/addrecurring Netflix 180k idr 1`_\n"
+        "• `/delrecurring [id]` — Delete a rule by ID\n\n"
+
+        "📊 *Analysis*\n"
+        "• `/summary` — Monthly balance + budget bars\n"
+        "• `/insight` — Financial score + 50/30/20\n"
+        "• `/history` — Last 10 transactions\n\n"
+
+        "⚙️ *Manage*\n"
+        "• `/undo` — Delete last expense\n"
+        "• `/setbudget [cat] [amt] [curr]` — Set spending limit\n"
+        "• `/clearbudget [cat?]` — View / clear budgets\n\n"
+
+        "💡 *Tip:* Type anything with a number (e.g. `lunch 25000`) and I will parse it automatically!"
     )
     await update.message.reply_text(msg, parse_mode='Markdown')
 
@@ -418,21 +453,149 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(msg, parse_mode='Markdown')
 
+async def recurring_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """List all recurring rules."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, description, amount, category, day_of_month, is_active FROM recurring_config ORDER BY day_of_month"
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        await update.message.reply_text(
+            "🔁 No recurring rules yet.\n"
+            "Add one with: `/addrecurring Netflix 180k idr 1`",
+            parse_mode='Markdown'
+        )
+        return
+
+    msg = "🔁 *Recurring Rules*\n\n"
+    for rid, desc, amt, cat, day, active in rows:
+        status = "🟢" if active else "⏸"
+        msg += f"{status} *#{rid}* {desc}\n"
+        msg += f"   {fmt(amt)} · {cat} · every day {day}\n\n"
+    msg += "Delete: `/delrecurring [id]`"
+    await update.message.reply_text(msg, parse_mode='Markdown')
+
+
+async def add_recurring(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Add a recurring rule. Usage: /addrecurring [desc] [amt] [curr] [day]"""
+    args = context.args
+    if len(args) < 3:
+        await update.message.reply_text(
+            "Usage: `/addrecurring [desc] [amt] [curr] [day]`\n"
+            "_e.g. `/addrecurring Netflix 180k idr 1`_",
+            parse_mode='Markdown'
+        )
+        return
+
+    # Last arg = day if numeric, else default 1
+    if args[-1].isdigit():
+        day = int(args[-1])
+        remaining = args[:-1]
+    else:
+        day = 1
+        remaining = args
+
+    amount_local, currency, description = parse_transaction_parts(remaining)
+    if not amount_local or not description:
+        await update.message.reply_text("❌ Couldn't parse. Try: `/addrecurring Kos 1.5m idr 1`", parse_mode='Markdown')
+        return
+
+    if not (1 <= day <= 28):
+        await update.message.reply_text("❌ Day must be 1–28.")
+        return
+
+    amount_usd = convert_to_usd(amount_local, currency)
+    category = guess_category(description)
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO recurring_config (amount, category, description, day_of_month, is_active) VALUES (?,?,?,?,1)",
+        (amount_usd, category, description, day)
+    )
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(
+        f"✅ *Recurring rule added!*\n"
+        f"📝 {description}\n"
+        f"💸 {fmt(amount_usd)} · {category}\n"
+        f"📅 Triggers every month on day {day}",
+        parse_mode='Markdown'
+    )
+
+
+async def del_recurring(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete a recurring rule by ID."""
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("Usage: `/delrecurring [id]`\nGet IDs from `/recurring`", parse_mode='Markdown')
+        return
+
+    rid = int(context.args[0])
+    conn = get_db()
+    row = conn.execute("SELECT description FROM recurring_config WHERE id=?", (rid,)).fetchone()
+    if not row:
+        await update.message.reply_text(f"❌ No rule with ID {rid}.")
+        conn.close()
+        return
+    conn.execute("DELETE FROM recurring_config WHERE id=?", (rid,))
+    conn.commit()
+    conn.close()
+    await update.message.reply_text(f"🗑️ Deleted recurring rule: *{row[0]}*", parse_mode='Markdown')
+
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower()
+    """Handle free-text messages: bank email paste or natural language expense."""
+    text = update.message.text
     income_keywords = ['income', 'salary', 'wage', 'gaji', 'wages', 'pemasukan']
-    
-    if any(re.search(r'\d', word) for word in text.split()):
-        context.args = text.split()
-        if any(kw in text for kw in income_keywords):
+
+    # --- Try Smart Parse (bank email) first ---
+    parsed = intelligence.parse_bank_email(text)
+    if parsed:
+        raw_currency = parsed.get('amount_currency', 'IDR')
+        amount_usd = parsed['amount'] / CURRENCY_RATES.get(raw_currency, 17000.0)
+        category = parsed['category']
+        description = parsed['description']
+        tx_date = parsed.get('date') or date.today().isoformat()
+        tx_type = parsed.get('tx_type', 'Bank Transaction')
+        lang = parsed.get('lang', 'id')
+
+        # Save directly as Draft
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO drafts (amount, description, date, category, source) VALUES (?,?,?,?,?)",
+            (amount_usd, description, tx_date, category, f"telegram_bot ({tx_type})")
+        )
+        conn.commit()
+        conn.close()
+
+        await update.message.reply_text(
+            f"🏦 *Bank notification detected!*\n\n"
+            f"📝 Vendor: *{description}*\n"
+            f"💸 Amount: *{fmt(amount_usd)}*\n"
+            f"📅 Date: {tx_date}\n"
+            f"🏷️ Category: {category}\n"
+            f"🔖 Type: {tx_type}\n\n"
+            f"✅ Saved as *Draft* — review it on the dashboard to approve.",
+            parse_mode='Markdown'
+        )
+        return
+
+    # --- Fall back: natural language expense/income ---
+    text_lower = text.lower()
+    if any(re.search(r'\d', word) for word in text_lower.split()):
+        context.args = text_lower.split()
+        if any(kw in text_lower for kw in income_keywords):
             await add_income(update, context)
         else:
             await add_expense(update, context)
     else:
         await update.message.reply_text(
             "I didn't understand that. Try:\n"
-            "• `/add coffee 5 usd`\n"
-            "• `/income salary 5000 usd`\n"
+            "• `/add alfamart 25k idr`\n"
+            "• `/income salary 5m idr`\n"
+            "• Or paste a BCA email notification directly!\n"
             "• `/summary` or `/insight`",
             parse_mode='Markdown'
         )
@@ -472,12 +635,14 @@ def main():
     app.add_handler(CommandHandler("setbudget", set_budget))
     app.add_handler(CommandHandler("undo", undo))
     app.add_handler(CommandHandler("history", history))
+    # --- New: Recurring Manager ---
+    app.add_handler(CommandHandler("recurring", recurring_list))
+    app.add_handler(CommandHandler("addrecurring", add_recurring))
+    app.add_handler(CommandHandler("delrecurring", del_recurring))
+    # --- Smart Parse lives in handle_text ---
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     print("Pulsar bot is running...")
     app.run_polling()
-
-if __name__ == '__main__':
-    main()
 
 if __name__ == '__main__':
     main()

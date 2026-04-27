@@ -688,8 +688,9 @@ def telegram_webhook():
     """
     Webhook endpoint to receive transaction data from a Telegram bot.
     Supports:
-    1. Parsed data: { "amount": 15.5, "description": "Starbucks Coffee", "source": "telegram" }
-    2. Raw text: { "text": "25000 Starbucks", "source": "telegram" }
+    1. Structured bank email text: auto-parsed by parse_bank_email()
+    2. Raw natural language: { "text": "25000 Starbucks" }
+    3. Pre-parsed fields: { "amount": 15.5, "description": "Starbucks" }
     """
     data = request.json
     if not data:
@@ -699,29 +700,53 @@ def telegram_webhook():
     tx_date = data.get("date", date.today().isoformat())
 
     try:
-        # Case 1: Raw text input (Natural Language)
+        # Case 1: Raw text input
         if "text" in data:
-            parsed = intelligence.parse_telegram_message(data["text"])
-            if not parsed:
-                return jsonify({"status": "error", "message": "Could not parse text"}), 400
-            
-            amount = parsed["amount"]
-            description = parsed["description"]
-            category = parsed["category"]
-        
+            raw_text = data["text"]
+
+            # Try structured bank email first
+            parsed = intelligence.parse_bank_email(raw_text)
+            if parsed:
+                amount = parsed["amount"]
+                description = parsed["description"]
+                category = parsed["category"]
+                # Use extracted date if available
+                if parsed.get("date"):
+                    tx_date = parsed["date"]
+                # Include tx_type in source label for audit trail
+                if parsed.get("tx_type"):
+                    source = f"bank_email ({parsed['tx_type']})"
+                else:
+                    source = "bank_email"
+            else:
+                # Fall back to free-text parser
+                parsed = intelligence.parse_telegram_message(raw_text)
+                if not parsed:
+                    return jsonify({"status": "error", "message": "Could not parse text"}), 400
+                amount = parsed["amount"]
+                description = parsed["description"]
+                category = parsed["category"]
+                usd_amount = amount  # free-text: amount already in display units, store as-is
+
         # Case 2: Already parsed fields
         elif "amount" in data and "description" in data:
             amount = float(data["amount"])
             description = data["description"].strip()
             category = data.get("category") or intelligence.categorize_transaction(description)
-        
+            usd_amount = amount
+
         else:
             return jsonify({"status": "error", "message": "Missing amount/description or text"}), 400
+
+        # For bank emails, convert using the detected source currency
+        if source.startswith("bank_email") and parsed:
+            raw_currency = parsed.get("amount_currency", "IDR")
+            usd_amount = amount / CURRENCY_RATES.get(raw_currency, 1.0)
 
         conn = get_db()
         conn.execute(
             "INSERT INTO drafts (amount, description, date, category, source) VALUES (?, ?, ?, ?, ?)",
-            (amount, description, tx_date, category, source)
+            (usd_amount, description, tx_date, category, source)
         )
         conn.commit()
         conn.close()
@@ -730,6 +755,62 @@ def telegram_webhook():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/parse-text", methods=["POST"])
+def api_parse_text():
+    """
+    Parse raw text (bank email, SMS, or free text) and return extracted fields.
+    Does NOT save to DB — returns parsed result for UI preview.
+
+    Body: { "text": "<raw text>" }
+    Response: { "amount": 180000, "description": "Alfacell", "date": "2026-04-24",
+                "category": "food", "source_type": "bank_email" | "free_text" }
+    """
+    data = request.json
+    if not data or "text" not in data:
+        return jsonify({"status": "error", "message": "Missing 'text' field"}), 400
+
+    raw_text = data["text"].strip()
+    if not raw_text:
+        return jsonify({"status": "error", "message": "Empty text"}), 400
+
+    # Try structured bank email first
+    parsed = intelligence.parse_bank_email(raw_text)
+    if parsed:
+        source_type = "bank_email"
+    else:
+        # Fall back to free-text
+        parsed = intelligence.parse_telegram_message(raw_text)
+        if not parsed:
+            return jsonify({"status": "error", "message": "Could not parse text. Try: '25000 Nasi Goreng'"}), 422
+        parsed["date"] = date.today().isoformat()
+        source_type = "free_text"
+
+    # Convert raw amount to display currency for the UI
+    currency = get_setting("currency", "USD")
+    rate = CURRENCY_RATES.get(currency, 1.0)
+    if source_type == "bank_email":
+        raw_currency = parsed.get("amount_currency", "IDR")
+        raw_rate = CURRENCY_RATES.get(raw_currency, 1.0)
+        display_amount = round(parsed["amount"] / raw_rate * rate, 2)
+    else:
+        display_amount = round(parsed["amount"] * rate, 2)
+
+    return jsonify({
+        "status": "success",
+        "source_type": source_type,
+        "amount_raw": parsed["amount"],
+        "amount_display": display_amount,
+        "amount_currency": parsed.get("amount_currency", "USD"),
+        "description": parsed["description"],
+        "date": parsed.get("date") or date.today().isoformat(),
+        "category": parsed["category"],
+        "tx_type": parsed.get("tx_type"),
+        "lang": parsed.get("lang", "id"),
+        "currency": currency,
+    })
+
 
 
 @app.route("/drafts/approve/<int:draft_id>", methods=["POST"])
@@ -774,6 +855,132 @@ def reject_draft(draft_id):
     conn.close()
     flash("Draft deleted.", "success")
     return redirect(url_for("dashboard"))
+
+
+# --- Recurring Manager ---
+@app.route("/recurring")
+def recurring_manager():
+    """View and manage recurring expense rules."""
+    conn = get_db()
+    configs = conn.execute(
+        "SELECT * FROM recurring_config ORDER BY day_of_month ASC, description ASC"
+    ).fetchall()
+    conn.close()
+
+    currency = get_setting("currency", "USD")
+    rate = CURRENCY_RATES.get(currency, 1.0)
+
+    active_count = sum(1 for c in configs if c["is_active"])
+    total_active_amount = sum(c["amount"] for c in configs if c["is_active"])
+
+    # Find the next day-of-month trigger that hasn't passed yet
+    today = date.today()
+    upcoming_days = sorted(
+        set(c["day_of_month"] for c in configs if c["is_active"] and c["day_of_month"] >= today.day)
+    )
+    next_trigger_day = upcoming_days[0] if upcoming_days else None
+
+    return render_template(
+        "recurring.html",
+        configs=configs,
+        active_count=active_count,
+        total_active_amount=total_active_amount,
+        next_trigger_day=next_trigger_day,
+        categories=EXPENSE_CATEGORIES,
+        category_map=CATEGORY_MAP,
+        current_currency=currency,
+        currency_rates=CURRENCY_RATES,
+    )
+
+
+@app.route("/recurring/add", methods=["POST"])
+def add_recurring():
+    """Add a new recurring expense rule."""
+    description = request.form.get("description", "").strip()
+    amount = request.form.get("amount", type=float)
+    category = request.form.get("category", "bills").strip()
+    day_of_month = request.form.get("day_of_month", type=int)
+
+    if not description or not amount or not day_of_month:
+        flash("All fields are required.", "error")
+        return redirect(url_for("recurring_manager"))
+
+    if not (1 <= day_of_month <= 28):
+        flash("Day of month must be between 1 and 28.", "error")
+        return redirect(url_for("recurring_manager"))
+
+    # Store amount in USD base
+    currency = get_setting("currency", "USD")
+    rate = CURRENCY_RATES.get(currency, 1.0)
+    usd_amount = amount / rate
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO recurring_config (amount, category, description, day_of_month, is_active) VALUES (?, ?, ?, ?, 1)",
+        (usd_amount, category, description, day_of_month),
+    )
+    conn.commit()
+    conn.close()
+
+    flash(f"Recurring rule '{description}' added!", "success")
+    return redirect(url_for("recurring_manager"))
+
+
+@app.route("/recurring/<int:config_id>/edit", methods=["POST"])
+def edit_recurring(config_id):
+    """Edit an existing recurring expense rule."""
+    description = request.form.get("description", "").strip()
+    amount = request.form.get("amount", type=float)
+    category = request.form.get("category", "bills").strip()
+    day_of_month = request.form.get("day_of_month", type=int)
+
+    if not description or not amount or not day_of_month:
+        flash("All fields are required.", "error")
+        return redirect(url_for("recurring_manager"))
+
+    if not (1 <= day_of_month <= 28):
+        flash("Day of month must be between 1 and 28.", "error")
+        return redirect(url_for("recurring_manager"))
+
+    currency = get_setting("currency", "USD")
+    rate = CURRENCY_RATES.get(currency, 1.0)
+    usd_amount = amount / rate
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE recurring_config SET amount = ?, category = ?, description = ?, day_of_month = ? WHERE id = ?",
+        (usd_amount, category, description, day_of_month, config_id),
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Recurring rule updated.", "success")
+    return redirect(url_for("recurring_manager"))
+
+
+@app.route("/recurring/<int:config_id>/toggle", methods=["POST"])
+def toggle_recurring(config_id):
+    """Toggle a recurring rule between active and paused."""
+    conn = get_db()
+    row = conn.execute("SELECT is_active FROM recurring_config WHERE id = ?", (config_id,)).fetchone()
+    if row:
+        new_state = 0 if row["is_active"] else 1
+        conn.execute("UPDATE recurring_config SET is_active = ? WHERE id = ?", (new_state, config_id))
+        conn.commit()
+        flash("Rule " + ("activated." if new_state else "paused."), "success")
+    conn.close()
+    return redirect(url_for("recurring_manager"))
+
+
+@app.route("/recurring/<int:config_id>/delete", methods=["POST"])
+def delete_recurring(config_id):
+    """Delete a recurring expense rule."""
+    conn = get_db()
+    conn.execute("DELETE FROM recurring_config WHERE id = ?", (config_id,))
+    conn.commit()
+    conn.close()
+    flash("Recurring rule deleted.", "success")
+    return redirect(url_for("recurring_manager"))
 
 
 # --- Export Data ---

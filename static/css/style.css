@@ -1247,3 +1247,135 @@ input[name="category_radio"] {
 .over-budget-text {
     color: var(--danger) !important;
 }
+
+/* === Recurring Manager === */
+.recurring-info-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    background: var(--info-bg);
+    border: 1px solid rgba(147, 197, 253, 0.15);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+    margin-bottom: var(--space-lg);
+    max-width: 800px;
+}
+
+.recurring-info-banner .recurring-info-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.recurring-info-banner p {
+    font-size: 0.8rem;
+    color: var(--info);
+    line-height: 1.5;
+}
+
+.recurring-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.recurring-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    transition: all var(--transition-fast);
+}
+
+.recurring-item:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-color);
+}
+
+.recurring-item.inactive {
+    opacity: 0.5;
+}
+
+.recurring-item.inactive:hover {
+    opacity: 0.75;
+}
+
+.recurring-actions {
+    display: flex;
+    gap: var(--space-xs);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.recurring-item:hover .recurring-actions {
+    opacity: 1;
+}
+
+.recurring-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: var(--space-sm);
+    vertical-align: middle;
+    letter-spacing: 0.03em;
+}
+
+.recurring-badge.active {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.recurring-badge.inactive {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+}
+
+/* Recurring Summary Grid */
+.recurring-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+}
+
+.recurring-summary-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    text-align: center;
+}
+
+.recurring-summary-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+}
+
+.recurring-summary-value {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.recurring-summary-sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+    .recurring-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

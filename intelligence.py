@@ -252,14 +252,68 @@ def categorize_transaction(description):
     desc_lower = description.lower()
     
     # Keyword mapping based on EXPENSE_CATEGORIES
+    # Expanded with common Indonesian QRIS merchants and e-wallet vendors
     mappings = {
-        'food': ['eating', 'food', 'lunch', 'dinner', 'breakfast', 'makan', 'snack', 'coffee', 'drink', 'restaurant', 'cafe', 'mcdonald', 'kfc', 'starbucks', 'burger', 'pizza', 'rice', 'boba', 'warung', 'grocery', 'supermarket', 'mart', 'indomaret', 'alfamart', 'bakery', 'steak', 'walmart', 'target'],
-        'transport': ['transport', 'grab', 'gojek', 'taxi', 'bus', 'fuel', 'gas', 'petrol', 'parking', 'parkir', 'uber', 'lyft', 'train', 'subway', 'flight', 'plane', 'airline', 'mrt', 'lrt', 'krl', 'toll', 'bensin', 'pertamina', 'shell', 'chevron', 'ride', 'commute'],
-        'shopping': ['shopping', 'clothes', 'clothing', 'shirt', 'shoes', 'buy', 'beli', 'amazon', 'mall', 'outfit', 'tech', 'gadget', 'laptop', 'phone', 'apple', 'best buy', 'tokopedia', 'tokped', 'shopee', 'lazada', 'skincare', 'makeup', 'electronics'],
-        'entertainment': ['entertainment', 'movie', 'game', 'netflix', 'spotify', 'cinema', 'xxi', 'cgv', 'ticket', 'concert', 'trip', 'holiday', 'vacation', 'steam', 'xbox', 'playstation', 'nintendo', 'disney', 'youtube', 'hbogo', 'hobby', 'museum', 'club'],
-        'health': ['health', 'medicine', 'doctor', 'gym', 'pharmacy', 'hospital', 'clinic', 'dentist', 'vet', 'apotek', 'skincare', 'fitness', 'workout', 'medical', 'supplement', 'vitamin', 'spa', 'massage', 'therapy', 'cvs', 'walgreens'],
-        'bills': ['bills', 'electricity', 'electric', 'water', 'internet', 'phone', 'rent', 'wifi', 'data', 'credit', 'telkomsel', 'pln', 'pdam', 'insurance', 'subscription', 'membership', 'icloud', 'tax', 'laundry', 'maintenance', 'comcast', 'att', 'verizon', 'mortgage', 'indihome'],
-        'education': ['education', 'school', 'college', 'university', 'tuition', 'course', 'udemy', 'coursera', 'bootcamp', 'bookstore', 'book'],
+        'food': [
+            # General
+            'eating', 'food', 'lunch', 'dinner', 'breakfast', 'makan', 'snack', 'coffee',
+            'drink', 'restaurant', 'cafe', 'bakery', 'steak', 'rice', 'boba', 'warung',
+            'grocery', 'supermarket', 'mart',
+            # Fast food chains
+            'mcdonald', 'kfc', 'starbucks', 'burger', 'pizza', 'subway', 'wendys',
+            'domino', 'popeyes', 'jollibee',
+            # Indonesian grocery & convenience
+            'indomaret', 'alfamart', 'alfacell', 'alfamidi', 'lawson', 'circle k',
+            'familymart', 'hypermart', 'superindo', 'giant', 'carrefour', 'transmart',
+            'lotte mart', 'lottemart', 'hero', 'yogya', 'borma', 'ramayana',
+            # Delivery & apps
+            'gofood', 'grabfood', 'shopeefood', 'shoppefood', 'traveloka eats',
+            # International
+            'walmart', 'target', 'costco', 'trader joe',
+        ],
+        'transport': [
+            'transport', 'grab', 'gojek', 'taxi', 'bus', 'fuel', 'gas', 'petrol',
+            'parking', 'parkir', 'uber', 'lyft', 'flight', 'plane', 'airline',
+            'mrt', 'lrt', 'krl', 'toll', 'bensin', 'pertamina', 'shell', 'chevron',
+            'ride', 'commute', 'gocar', 'grabcar', 'maxim', 'indriver', 'bluebird',
+            'kereta', 'damri', 'transjakarta', 'busway', 'pelni', 'garuda', 'citilink',
+            'lion air', 'airasia', 'batik air', 'sriwijaya', 'tol', 'jasa marga',
+        ],
+        'shopping': [
+            'shopping', 'clothes', 'clothing', 'shirt', 'shoes', 'buy', 'beli',
+            'amazon', 'mall', 'outfit', 'tech', 'gadget', 'laptop', 'apple', 'best buy',
+            'tokopedia', 'tokped', 'shopee', 'lazada', 'blibli', 'bukalapak',
+            'tiktok shop', 'zalora', 'berrybenka', 'hijup', 'uniqlo', 'zara', 'h&m',
+            'iphone', 'samsung', 'electronics', 'skincare', 'makeup', 'wardah',
+            'sogo', 'matahari', 'the body shop', 'guardian', 'watson',
+        ],
+        'entertainment': [
+            'entertainment', 'movie', 'game', 'netflix', 'spotify', 'cinema', 'xxi', 'cgv',
+            'ticket', 'concert', 'trip', 'holiday', 'vacation', 'steam', 'xbox',
+            'playstation', 'nintendo', 'disney', 'youtube', 'hbogo', 'vidio', 'mola',
+            'viu', 'wetv', 'iqiyi', 'prime video', 'apple tv', 'hobby', 'museum',
+            'club', 'karaoke', 'bowling', 'billiard', 'esports', 'tiket', 'traveloka',
+        ],
+        'health': [
+            'health', 'medicine', 'doctor', 'gym', 'pharmacy', 'hospital', 'clinic',
+            'dentist', 'vet', 'apotek', 'fitness', 'workout', 'medical', 'supplement',
+            'vitamin', 'spa', 'massage', 'therapy', 'cvs', 'walgreens',
+            'kimia farma', 'guardian', 'k24', 'century', 'generik', 'puskesmas',
+            'rs ', 'rumah sakit', 'bpjs', 'halodoc', 'alodokter', 'klikdokter',
+        ],
+        'bills': [
+            'bills', 'electricity', 'electric', 'water', 'internet', 'rent', 'wifi',
+            'data', 'credit', 'pln', 'pdam', 'insurance', 'subscription', 'membership',
+            'icloud', 'tax', 'laundry', 'maintenance', 'mortgage',
+            'telkomsel', 'xl', 'indosat', 'tri', 'smartfren', 'byuprifix',
+            'indihome', 'myrepublic', 'firstmedia', 'biznet', 'cbni',
+            'comcast', 'att', 'verizon', 'kos', 'kontrakan', 'sewa',
+        ],
+        'education': [
+            'education', 'school', 'college', 'university', 'tuition', 'course',
+            'udemy', 'coursera', 'bootcamp', 'bookstore', 'book', 'dicoding',
+            'ruangguru', 'zenius', 'skill academy', 'bimbel', 'les', 'kursus',
+        ],
     }
 
     
@@ -325,4 +379,228 @@ def parse_telegram_message(text):
         "amount": amount,
         "description": description,
         "category": category
+    }
+
+
+def parse_bank_email(text):
+    """
+    Parse structured bank notification email/SMS text.
+
+    Supported formats:
+    ── Indonesian ──────────────────────────────────────────
+    - BCA myBCA   : "Total Bayar : IDR 180,000.00"
+    - Mandiri     : "Transaksi berhasil sebesar IDR..."
+    - BNI / BRI   : similar field labels in Indonesian
+
+    ── English ─────────────────────────────────────────────
+    - Visa/MC SMS : "A transaction of USD 12.50 at Starbucks"
+    - PayPal      : "You sent $25.00 to merchant@example.com"
+    - Generic EN  : "Amount: $180.00 | Merchant: Amazon"
+    - UK banks    : "Payment of £50.00 to TESCO"
+    - SG banks    : "SGD 120.00 was debited from your account"
+
+    Returns a dict or None if text is not a bank notification.
+    Extra key `amount_currency` carries the detected currency code
+    so callers can convert correctly (default 'IDR' for Indonesian).
+    """
+    if not text:
+        return None
+
+    import re
+
+    text_lower = text.lower()
+
+    # ── Detection markers ───────────────────────────────────
+    id_markers = [
+        'total bayar', 'tanggal transaksi', 'pembayaran ke', 'jenis transaksi',
+        'nomor referensi', 'sumber dana', 'halo bca', 'transfer berhasil',
+        'transaksi berhasil', 'debit rekening', 'tabungan', 'mybca',
+        'mandiri', 'bni mobile', 'bri mobile', 'blu by bca', 'jenius',
+        'gopay', 'ovo', 'dana', 'linkaja',
+    ]
+    en_markers = [
+        'transaction alert', 'payment confirmation', 'you have made a payment',
+        'a transaction of', 'was charged to your', 'was debited from your',
+        'payment of', 'you sent', 'purchase at', 'transaction at',
+        'amount due', 'amount charged', 'card ending', 'your account ending',
+        'authorization code', 'reference number', 'transaction id',
+        'merchant name', 'merchant:', 'paypal', 'stripe', 'wise transfer',
+        'revolut', 'monzo', 'chase', 'barclays', 'hsbc alert',
+        # PayPal / wallet patterns
+        'you sent $', 'you sent £', 'you sent €', 'you sent usd',
+        'sent to', 'payment sent', 'receipt from', 'receipt for',
+    ]
+
+    is_indonesian = any(m in text_lower for m in id_markers)
+    is_english    = any(m in text_lower for m in en_markers)
+
+    if not is_indonesian and not is_english:
+        return None  # Not a bank notification — let caller use parse_telegram_message
+
+    detected_currency = 'IDR' if is_indonesian else 'USD'  # default; refined below
+
+    # ── Amount extraction ────────────────────────────────────
+    # Currency symbol → code map for English notifications
+    symbol_map = {
+        r'\$': 'USD', r'usd': 'USD',
+        r'£':  'GBP', r'gbp': 'GBP',
+        r'€':  'EUR', r'eur': 'EUR',
+        r'sgd':'SGD', r's\$': 'SGD',
+        r'aud':'AUD', r'a\$': 'AUD',
+        r'idr':'IDR', r'rp\.?': 'IDR',
+    }
+
+    # Indonesian amount patterns
+    id_amount_patterns = [
+        r'Total Bayar\s*:\s*IDR\s*([\d,\.]+)',
+        r'Total Bayar\s*:\s*Rp\.?\s*([\d,\.]+)',
+        r'sebesar\s+(?:IDR|Rp)\.?\s*([\d,\.]+)',
+        r'jumlah\s*:\s*(?:IDR|Rp)\.?\s*([\d,\.]+)',
+        r'nominal\s*:\s*(?:IDR|Rp)\.?\s*([\d,\.]+)',
+        r'(?:IDR|Rp)\.?\s*([\d]{3,}(?:[,\.][\d]+)*)',  # any IDR amount as fallback
+    ]
+
+    # English amount patterns — each captures (symbol_hint, digits)
+    en_amount_patterns = [
+        # "a transaction of USD 12.50"
+        r'(?:transaction|payment|amount|charged?|debited?)\s+of\s+(?:USD|GBP|EUR|SGD|AUD)?\s*([\d,\.]+)',
+        # "Amount: $180.00" or "Amount Due: £50"
+        r'[Aa]mount(?:\s+[Dd]ue|\s+[Cc]harged?)?\s*:\s*[\$£€]?\s*([\d,\.]+)',
+        # "you sent $25.00"
+        r'(?:you\s+sent|sent)\s+[\$£€]?\s*([\d,\.]+)',
+        # "Payment of £50.00"
+        r'[Pp]ayment\s+of\s+[\$£€]?\s*([\d,\.]+)',
+        # "SGD 120.00 was debited"
+        r'(?:USD|GBP|EUR|SGD|AUD|IDR)\s+([\d,\.]+)',
+        # "$25.00" standalone
+        r'[\$£€]([\d,\.]+)',
+        # "25.00 USD"
+        r'([\d,\.]+)\s+(?:USD|GBP|EUR|SGD|AUD)',
+    ]
+
+    def _normalize_amount(raw):
+        """Normalize a raw amount string to float, handling both locale formats."""
+        raw = raw.strip()
+        # European: 1.234,56 → comma is decimal
+        if re.search(r',\d{2}$', raw):
+            return float(raw.replace('.', '').replace(',', '.'))
+        # American / IDR: 1,234.56 → comma is thousands
+        return float(raw.replace(',', ''))
+
+    amount = None
+    patterns_to_try = (id_amount_patterns if is_indonesian else []) + en_amount_patterns
+    for pat in patterns_to_try:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            try:
+                amount = _normalize_amount(m.group(1))
+                # Detect currency from surrounding context
+                start = max(0, m.start() - 10)
+                ctx = text[start: m.end() + 4].upper()
+                for sym, code in [('IDR','IDR'),('RP','IDR'),('USD','USD'),
+                                   ('GBP','GBP'),('EUR','EUR'),('SGD','SGD'),
+                                   ('AUD','AUD'),('£','GBP'),('€','EUR'),('$','USD')]:
+                    if sym in ctx:
+                        detected_currency = code
+                        break
+                break
+            except ValueError:
+                continue
+
+    if amount is None:
+        return None
+
+    # ── Vendor / Merchant extraction ─────────────────────────
+    vendor = None
+    vendor_patterns = [
+        # Indonesian
+        r'Pembayaran Ke\s*:\s*(.+)',
+        r'Ditransfer ke\s*:\s*(.+)',
+        r'Kepada\s*:\s*(.+)',
+        r'Tujuan\s*:\s*(.+)',
+        # English
+        r'[Mm]erchant(?:\s+[Nn]ame)?\s*:\s*(.+)',
+        r'[Pp]ayment\s+[Tt]o\s*:\s*(.+)',
+        r'[Pp]aid\s+[Tt]o\s*:\s*(.+)',
+        r'[Pp]urchase\s+[Aa]t\s*:\s*(.+)',
+        r'[Tt]ransaction\s+[Aa]t\s*:\s*(.+)',
+        r'[Tt]o\s*:\s*(.+@.+)',                # PayPal "To: email@x.com"
+        r'[Ss]ent\s+to\s*:\s*(.+)',
+        r'[Pp]ayee\s*:\s*(.+)',
+        r'[Bb]eneficiary\s*:\s*(.+)',
+        r'[Ss]tore\s*:\s*(.+)',
+        r'[Vv]endor\s*:\s*(.+)',
+        # Generic: "at <Merchant>" — works inline (no newline needed)
+        r'(?:at|@)\s+([A-Z][A-Za-z0-9 &\'\-\.]{2,40})(?=\s*(?:was|on|[,\.\n\r]|$))',
+        # PayPal: "to email@domain" — use domain as vendor
+        r'(?:to|sent\s+to)\s+([\w\.\-]+@[\w\.]+)',
+    ]
+    for pat in vendor_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            vendor = re.split(r'[\t\n\r]', m.group(1).strip())[0].strip()
+            # Strip trailing junk like reference numbers
+            vendor = re.sub(r'\s{2,}.*$', '', vendor).strip()
+            if vendor:
+                break
+
+    if not vendor:
+        vendor = 'Bank Transaction'
+
+    # ── Date extraction ──────────────────────────────────────
+    tx_date = None
+    date_patterns = [
+        # Indonesian
+        (r'Tanggal Transaksi\s*:\s*(\d{1,2}\s+\w+\s+\d{4})',    '%d %b %Y'),
+        (r'Tanggal Transaksi\s*:\s*(\d{1,2}-\w+-\d{4})',         '%d-%b-%Y'),
+        (r'Tanggal\s*:\s*(\d{1,2}\s+\w+\s+\d{4})',              '%d %b %Y'),
+        # English labelled
+        (r'[Dd]ate\s*:\s*(\d{4}-\d{2}-\d{2})',                  '%Y-%m-%d'),
+        (r'[Dd]ate\s*:\s*(\d{1,2}/\d{2}/\d{4})',                '%d/%m/%Y'),
+        (r'[Dd]ate\s*:\s*(\d{1,2}\s+\w+\s+\d{4})',             '%d %b %Y'),
+        (r'[Dd]ate\s*:\s*(\w+\s+\d{1,2},?\s+\d{4})',           '%B %d %Y'),
+        (r'[Tt]ransaction [Dd]ate\s*:\s*(\d{4}-\d{2}-\d{2})',  '%Y-%m-%d'),
+        (r'[Tt]ransaction [Dd]ate\s*:\s*(\d{1,2}/\d{2}/\d{4})','%d/%m/%Y'),
+        # ISO anywhere in text
+        (r'(\d{4}-\d{2}-\d{2})',                                 '%Y-%m-%d'),
+    ]
+    for pat, fmt in date_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            try:
+                from datetime import datetime as _dt
+                raw_date = m.group(1).strip().replace(',', '')
+                tx_date = _dt.strptime(raw_date, fmt).strftime('%Y-%m-%d')
+                break
+            except ValueError:
+                continue
+
+    # ── Transaction type ─────────────────────────────────────
+    tx_type = None
+    type_patterns = [
+        r'Jenis Transaksi\s*:\s*(.+)',          # Indonesian
+        r'[Tt]ransaction [Tt]ype\s*:\s*(.+)',   # English
+        r'[Pp]ayment [Tt]ype\s*:\s*(.+)',
+        r'[Tt]ype\s*:\s*(.+)',
+    ]
+    for pat in type_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            tx_type = re.split(r'[\t\n\r]', m.group(1).strip())[0].strip()
+            break
+
+    if not tx_type:
+        tx_type = 'English Bank Notification' if is_english else 'Indonesian Bank Notification'
+
+    category = categorize_transaction(vendor)
+
+    return {
+        'amount':           amount,
+        'amount_currency':  detected_currency,   # NEW: lets caller convert correctly
+        'description':      vendor,
+        'date':             tx_date,
+        'category':         category,
+        'source_type':      'bank_email',
+        'tx_type':          tx_type,
+        'lang':             'en' if is_english else 'id',
     }

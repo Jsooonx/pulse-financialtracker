@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}Pulse - Recurring Manager{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="navbar-brand">
+        <div class="logo-icon">⚡</div>
+        <h1>Pulse</h1>
+    </div>
+</nav>
+
+<a href="{{ url_for('dashboard') }}" class="back-link">← Back to Dashboard</a>
+
+<!-- Header -->
+<div class="category-header">
+    <div class="category-header-icon" style="background: rgba(253, 224, 71, 0.1);">
+        ⚙️
+    </div>
+    <div class="category-header-info">
+        <h2>Recurring Manager</h2>
+        <div class="category-header-total">
+            {{ configs | length }} rule{{ 's' if configs | length != 1 else '' }} configured
+            · {{ active_count }} active
+        </div>
+    </div>
+</div>
+
+<!-- Info Banner -->
+<div class="recurring-info-banner">
+    <span class="recurring-info-icon">💡</span>
+    <p>Recurring rules auto-generate expenses on the configured day of each month. They trigger when you visit the dashboard for the current month.</p>
+</div>
+
+<!-- Main Panel -->
+<div class="panel" style="max-width: 800px;">
+    <div class="panel-header">
+        <h3 class="panel-title">Your Rules</h3>
+        <button class="btn btn-primary btn-sm" onclick="openModal('add-recurring-modal')">+ New Rule</button>
+    </div>
+
+    {% if configs %}
+    <div class="recurring-list">
+        {% for cfg in configs %}
+        {% set cat = category_map.get(cfg.category, {"label": cfg.category, "icon": "📦", "color": "#B2BEC3"}) %}
+        <div class="recurring-item {{ 'inactive' if not cfg.is_active else '' }}">
+            <!-- Icon -->
+            <div class="transaction-icon" style="background: {{ cat.color }}20;">
+                {{ cat.icon }}
+            </div>
+
+            <!-- Info -->
+            <div class="transaction-info">
+                <div class="transaction-desc">
+                    {{ cfg.description }}
+                    {% if cfg.is_active %}
+                    <span class="recurring-badge active">● Active</span>
+                    {% else %}
+                    <span class="recurring-badge inactive">○ Paused</span>
+                    {% endif %}
+                </div>
+                <div class="transaction-meta">
+                    {{ cat.label }} · Every month on day <strong>{{ cfg.day_of_month }}</strong>
+                </div>
+            </div>
+
+            <!-- Amount -->
+            <div class="transaction-amount" style="color: var(--danger);">
+                -{{ cfg.amount | currency }}
+            </div>
+
+            <!-- Actions -->
+            <div class="recurring-actions">
+                <!-- Toggle Active/Paused -->
+                <form action="{{ url_for('toggle_recurring', config_id=cfg.id) }}" method="POST" style="display:inline;">
+                    <button type="submit"
+                            class="btn btn-ghost btn-sm"
+                            title="{{ 'Pause' if cfg.is_active else 'Activate' }}">
+                        {{ '⏸' if cfg.is_active else '▶' }}
+                    </button>
+                </form>
+                <!-- Edit -->
+                <button class="btn btn-ghost btn-sm"
+                        onclick="openEditRecurring({{ cfg.id }}, '{{ cfg.description }}', {{ cfg.amount }}, '{{ cfg.category }}', {{ cfg.day_of_month }})"
+                        title="Edit">✎</button>
+                <!-- Delete -->
+                <form action="{{ url_for('delete_recurring', config_id=cfg.id) }}" method="POST" style="display:inline;"
+                      onsubmit="return confirm('Delete this recurring rule?')">
+                    <button type="submit" class="btn btn-danger btn-icon btn-sm" title="Delete">✕</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">🔁</div>
+        <p>No recurring rules yet.</p>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: var(--space-xs);">Add your first rule for subscriptions, rent, or any fixed monthly expense.</p>
+        <button class="btn btn-primary" style="margin-top: var(--space-md);" onclick="openModal('add-recurring-modal')">+ Add Rule</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Summary Panel (only shown if there are configs) -->
+{% if configs %}
+<div class="panel" style="max-width: 800px; margin-top: var(--space-lg);">
+    <div class="panel-header">
+        <h3 class="panel-title">Monthly Commitment</h3>
+    </div>
+    <div class="recurring-summary-grid">
+        <div class="recurring-summary-card">
+            <div class="recurring-summary-label">Total Active</div>
+            <div class="recurring-summary-value" style="color: var(--danger);">
+                {{ total_active_amount | currency }}
+            </div>
+            <div class="recurring-summary-sub">/ month</div>
+        </div>
+        <div class="recurring-summary-card">
+            <div class="recurring-summary-label">Active Rules</div>
+            <div class="recurring-summary-value">{{ active_count }}</div>
+            <div class="recurring-summary-sub">of {{ configs | length }} total</div>
+        </div>
+        <div class="recurring-summary-card">
+            <div class="recurring-summary-label">Next Trigger</div>
+            <div class="recurring-summary-value" style="font-size: 1rem;">
+                {% if next_trigger_day %}
+                Day {{ next_trigger_day }}
+                {% else %}
+                —
+                {% endif %}
+            </div>
+            <div class="recurring-summary-sub">of this month</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- Add Recurring Modal -->
+<div class="modal-overlay" id="add-recurring-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>New Recurring Rule</h2>
+            <button class="modal-close" onclick="closeModal('add-recurring-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form action="{{ url_for('add_recurring') }}" method="POST">
+                <input type="hidden" name="category" id="add-recurring-category" value="bills">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="category-select-grid">
+                        {% for cat in categories %}
+                        <label class="category-select-item {{ 'active' if cat.id == 'bills' else '' }}"
+                               onclick="handleCategorySelection('{{ cat.id }}', this, 'add-recurring-modal', 'add-recurring-category')">
+                            <input type="radio" name="category_radio" value="{{ cat.id }}" {{ 'checked' if cat.id == 'bills' else '' }}>
+                            <span class="cat-emoji">{{ cat.icon }}</span>
+                            {{ cat.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="add-recurring-desc">Description</label>
+                    <input type="text" class="form-input" id="add-recurring-desc" name="description"
+                           placeholder="e.g. Netflix, Kos, Indihome" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="add-recurring-amount">
+                            Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})
+                        </label>
+                        <input type="number" step="0.01" class="form-input" id="add-recurring-amount"
+                               name="amount" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="add-recurring-day">Day of Month</label>
+                        <input type="number" class="form-input" id="add-recurring-day"
+                               name="day_of_month" min="1" max="28" value="1" required>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Max day: 28 (safe for all months)</div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Save Rule
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Recurring Modal -->
+<div class="modal-overlay" id="edit-recurring-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Edit Rule</h2>
+            <button class="modal-close" onclick="closeModal('edit-recurring-modal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-recurring-form" method="POST">
+                <input type="hidden" name="category" id="edit-recurring-category">
+
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="category-select-grid" id="edit-recurring-cat-grid">
+                        {% for cat in categories %}
+                        <label class="category-select-item"
+                               data-category="{{ cat.id }}"
+                               onclick="handleCategorySelection('{{ cat.id }}', this, 'edit-recurring-cat-grid', 'edit-recurring-category')">
+                            <input type="radio" name="edit_category_radio" value="{{ cat.id }}">
+                            <span class="cat-emoji">{{ cat.icon }}</span>
+                            {{ cat.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="edit-recurring-desc">Description</label>
+                    <input type="text" class="form-input" id="edit-recurring-desc" name="description" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-recurring-amount">
+                            Amount ({% if current_currency == 'USD' %}${% elif current_currency == 'EUR' %}€{% else %}Rp{% endif %})
+                        </label>
+                        <input type="number" step="0.01" class="form-input" id="edit-recurring-amount"
+                               name="amount" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-recurring-day">Day of Month</label>
+                        <input type="number" class="form-input" id="edit-recurring-day"
+                               name="day_of_month" min="1" max="28" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--space-sm);">
+                    Update Rule
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/category.js') }}"></script>
+<script>
+function openEditRecurring(id, description, amount, category, day) {
+    // Set form action
+    document.getElementById('edit-recurring-form').action = `/recurring/${id}/edit`;
+
+    // Populate fields
+    document.getElementById('edit-recurring-desc').value = description;
+    document.getElementById('edit-recurring-day').value = day;
+    document.getElementById('edit-recurring-category').value = category;
+
+    // Convert amount from USD base to display currency
+    const rate = {{ currency_rates | tojson }}['{{ current_currency }}'] || 1.0;
+    document.getElementById('edit-recurring-amount').value = (amount * rate).toFixed(2);
+
+    // Highlight category in grid
+    document.querySelectorAll('#edit-recurring-cat-grid .category-select-item').forEach(el => {
+        el.classList.remove('active');
+        if (el.dataset.category === category) {
+            el.classList.add('active');
+        }
+    });
+
+    openModal('edit-recurring-modal');
+}
+</script>
+{% endblock %}

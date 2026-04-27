@@ -12,9 +12,11 @@
     <div class="navbar-nav">
         <div style="display: flex; flex-direction: column; align-items: flex-end;">
             <div style="display: flex; gap: var(--space-md); align-items: center;">
+                <a href="{{ url_for('recurring_manager') }}" class="btn btn-ghost btn-sm" title="Manage recurring rules">🔁 Recurring</a>
                 <a href="{{ url_for('export_excel') }}" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0d9488, #10b981); border: none; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);">📊 Export Excel</a>
                 <a href="{{ url_for('export_csv') }}" class="btn btn-ghost btn-sm">📥 Export CSV</a>
             </div>
+
             <div style="font-size: 0.62rem; color: var(--text-muted); margin-top: 4px; font-style: italic; opacity: 0.8;">
                 Excel: Styled Report &nbsp; | &nbsp; CSV: Raw Data
             </div>
@@ -265,7 +267,79 @@
 </div>
 {% endif %}
 
+<!-- Smart Paste Panel -->
+<div class="content-grid full-width" style="margin-bottom: var(--space-lg);">
+    <div class="panel smart-paste-panel" id="smart-paste-panel">
+        <div class="panel-header" style="cursor: pointer;" onclick="toggleSmartPaste()">
+            <h3 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.1rem;">📋</span>
+                Smart Paste
+                <span style="font-size: 0.7rem; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--text-muted); margin-left: 4px;">— Paste bank email or SMS</span>
+            </h3>
+            <span class="panel-badge" id="smart-paste-toggle-badge">▼ Expand</span>
+        </div>
+
+        <div id="smart-paste-body" style="display: none;">
+            <!-- Input Area -->
+            <div class="form-group" style="margin-bottom: var(--space-md);">
+                <label class="form-label" for="smart-paste-input">Paste notification text</label>
+                <textarea class="form-textarea" id="smart-paste-input" rows="6"
+                          placeholder="Paste BCA email, SMS notification, or type free text like '25000 Alfamart'..."
+                          style="font-size: 0.8rem; font-family: monospace; resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; gap: var(--space-sm); align-items: center; margin-bottom: var(--space-lg);">
+                <button class="btn btn-primary" id="smart-parse-btn" onclick="smartParse()">
+                    🔍 Parse →
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="clearSmartPaste()">Clear</button>
+                <span id="smart-parse-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+            </div>
+
+            <!-- Parsed Result (hidden until parse succeeds) -->
+            <div id="smart-parse-result" style="display: none;">
+                <div style="border-top: 1px solid var(--border-color); padding-top: var(--space-md); margin-bottom: var(--space-md);">
+                    <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600; margin-bottom: var(--space-md);">
+                        Parsed Result
+                        <span id="smart-parse-type-badge" style="display: inline-block; margin-left: 8px; background: var(--info-bg); color: var(--info); padding: 1px 6px; border-radius: 4px; font-size: 0.6rem;"></span>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: var(--space-md);">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Vendor / Description</label>
+                            <input type="text" class="form-input" id="sp-description" placeholder="Vendor name">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" id="sp-amount-label">Amount</label>
+                            <input type="number" step="0.01" class="form-input" id="sp-amount" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-bottom: var(--space-md);">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-input" id="sp-date">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Category</label>
+                            <select class="form-input" id="sp-category">
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" style="width: 100%;" onclick="saveParsedAsDraft()">
+                        💾 Save as Draft
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Main Content -->
+
 <div class="content-grid">
     <!-- Pie Chart -->
     <div class="panel">
@@ -635,4 +709,128 @@
     };
 </script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+// === Smart Paste ===
+let _spParsed = null; // holds last successful parse result
+
+function toggleSmartPaste() {
+    const body = document.getElementById('smart-paste-body');
+    const badge = document.getElementById('smart-paste-toggle-badge');
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? 'block' : 'none';
+    badge.textContent = isHidden ? '▲ Collapse' : '▼ Expand';
+}
+
+async function smartParse() {
+    const text = document.getElementById('smart-paste-input').value.trim();
+    const statusEl = document.getElementById('smart-parse-status');
+    const resultEl = document.getElementById('smart-parse-result');
+    const btn = document.getElementById('smart-parse-btn');
+
+    if (!text) {
+        statusEl.textContent = '⚠ Please paste some text first.';
+        statusEl.style.color = 'var(--warning)';
+        return;
+    }
+
+    btn.textContent = '⏳ Parsing...';
+    btn.disabled = true;
+    statusEl.textContent = '';
+    resultEl.style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/parse-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok || data.status !== 'success') {
+            statusEl.textContent = '✕ ' + (data.message || 'Parse failed.');
+            statusEl.style.color = 'var(--danger)';
+            return;
+        }
+
+        _spParsed = data;
+
+        // Populate fields
+        document.getElementById('sp-description').value = data.description;
+        document.getElementById('sp-amount').value = data.amount_display;
+        document.getElementById('sp-date').value = data.date;
+
+        const currSymbol = data.currency === 'IDR' ? 'Rp' : data.currency === 'EUR' ? '€' : '$';
+        document.getElementById('sp-amount-label').textContent = `Amount (${currSymbol})`;
+
+        const catSelect = document.getElementById('sp-category');
+        for (let opt of catSelect.options) {
+            if (opt.value === data.category) { opt.selected = true; break; }
+        }
+
+        const typeBadge = document.getElementById('smart-parse-type-badge');
+        typeBadge.textContent = data.source_type === 'bank_email'
+            ? '🏦 Bank Email' : '💬 Free Text';
+
+        statusEl.textContent = '✓ Parsed successfully!';
+        statusEl.style.color = 'var(--success)';
+        resultEl.style.display = 'block';
+
+    } catch (e) {
+        statusEl.textContent = '✕ Network error. Is the server running?';
+        statusEl.style.color = 'var(--danger)';
+    } finally {
+        btn.textContent = '🔍 Parse →';
+        btn.disabled = false;
+    }
+}
+
+async function saveParsedAsDraft() {
+    const description = document.getElementById('sp-description').value.trim();
+    const amount = parseFloat(document.getElementById('sp-amount').value);
+    const txDate = document.getElementById('sp-date').value;
+    const category = document.getElementById('sp-category').value;
+    const statusEl = document.getElementById('smart-parse-status');
+
+    if (!description || !amount || !txDate) {
+        statusEl.textContent = '⚠ Please fill all fields before saving.';
+        statusEl.style.color = 'var(--warning)';
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/webhook/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount,
+                description,
+                date: txDate,
+                category,
+                source: _spParsed && _spParsed.source_type === 'bank_email' ? 'smart_paste (bank)' : 'smart_paste',
+            }),
+        });
+        const data = await resp.json();
+        if (resp.ok && data.status === 'success') {
+            statusEl.textContent = '✓ Saved as draft!';
+            statusEl.style.color = 'var(--success)';
+            // Reload to show new draft in Drafts Inbox
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            statusEl.textContent = '✕ ' + (data.message || 'Save failed.');
+            statusEl.style.color = 'var(--danger)';
+        }
+    } catch (e) {
+        statusEl.textContent = '✕ Network error.';
+        statusEl.style.color = 'var(--danger)';
+    }
+}
+
+function clearSmartPaste() {
+    document.getElementById('smart-paste-input').value = '';
+    document.getElementById('smart-parse-result').style.display = 'none';
+    document.getElementById('smart-parse-status').textContent = '';
+    _spParsed = null;
+}
+</script>
+
 {% endblock %}
