@@ -6,37 +6,59 @@
 <nav class="navbar">
     <div class="navbar-brand">
         <div class="logo-icon">⚡</div>
-        <h1>Pulse</h1>
-        <span class="tagline">Know your financial rhythm</span>
+        <div style="display: flex; flex-direction: column;">
+            <h1>Pulse</h1>
+            <span class="tagline">Know your financial rhythm</span>
+        </div>
     </div>
-    <div class="navbar-nav">
-        <div style="display: flex; flex-direction: column; align-items: flex-end;">
-            <div style="display: flex; gap: var(--space-md); align-items: center;">
-                <a href="{{ url_for('recurring_manager') }}" class="btn btn-ghost btn-sm" title="Manage recurring rules">🔁 Recurring</a>
-                <a href="{{ url_for('export_excel') }}" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0d9488, #10b981); border: none; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);">📊 Export Excel</a>
-                <a href="{{ url_for('export_csv') }}" class="btn btn-ghost btn-sm">📥 Export CSV</a>
+    <div class="navbar-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-md);">
+        
+        <!-- Top Row: Auth & Tools -->
+        <div style="display: flex; gap: var(--space-md); align-items: center;">
+            <div style="display: flex; gap: var(--space-sm); align-items: center;">
+                <form action="{{ url_for('load_dummy_data') }}" method="POST" style="margin: 0;">
+                    <button type="submit" class="btn btn-ghost btn-sm" style="color: var(--warning); border-color: transparent; padding: 4px 8px; border-radius: var(--radius-md); font-weight: 500;" title="Load sample data" onclick="return confirm('Load fake data into this account?')">
+                        🧪 Dummy Data
+                    </button>
+                </form>
+                <a href="{{ url_for('recurring_manager') }}" class="btn btn-ghost btn-sm" style="border-color: transparent; padding: 4px 8px; border-radius: var(--radius-md); font-weight: 500;" title="Recurring rules">🔁 Recurring</a>
             </div>
 
-            <div style="font-size: 0.62rem; color: var(--text-muted); margin-top: 4px; font-style: italic; opacity: 0.8;">
-                Excel: Styled Report &nbsp; | &nbsp; CSV: Raw Data
+            <div class="nav-divider" style="height: 16px;"></div>
+
+            <!-- Sleek Auth Pill -->
+            <button id="auth-action-btn" class="btn" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 30px; padding: 4px 16px 4px 4px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); transition: all 0.2s; box-shadow: var(--shadow-sm); cursor: pointer; white-space: nowrap;">
+                <span id="auth-status-icon" style="background: var(--bg-elevated); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 1px var(--border-color);">👤</span>
+                <span id="auth-status-text" style="font-size: 0.8rem; font-weight: 600; font-family: 'Inter', sans-serif;">Guest Mode</span>
+            </button>
+        </div>
+
+        <!-- Bottom Row: Selectors & Export -->
+        <div style="display: flex; gap: var(--space-md); align-items: center;">
+            <div style="display: flex; background: var(--bg-card); border-radius: var(--radius-sm); border: 1px solid var(--border-color); overflow: hidden; height: 32px; align-items: center;">
+                <a href="{{ url_for('export_excel') }}" style="padding: 0 12px; height: 100%; display: flex; align-items: center; font-size: 0.75rem; font-weight: 600; color: white; background: linear-gradient(135deg, #0d9488, #10b981); text-decoration: none;">📊 Excel</a>
+                <a href="{{ url_for('export_csv') }}" style="padding: 0 12px; height: 100%; display: flex; align-items: center; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-elevated)'" onmouseout="this.style.background='transparent'">📥 CSV</a>
             </div>
-        </div>
-        <div class="month-selector">
-            <span style="font-size: 0.85rem;">📅</span>
-            <select id="month-select" onchange="navigateMonth()">
-                {% for m in range(1, 13) %}
-                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
-                    {{ month_names[m] }}
-                </option>
-                {% endfor %}
-            </select>
-            <select id="year-select" onchange="navigateMonth()">
-                {% for y in range(current_year - 2, current_year + 2) %}
-                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="currency-selector-container">
+            
+            <div class="nav-divider" style="height: 16px;"></div>
+
+            <div class="month-selector" style="background: var(--bg-card); padding: 2px 12px; border-radius: var(--radius-sm); margin: 0; height: 32px; display: flex; align-items: center;">
+                <span style="font-size: 0.85rem; margin-right: 4px;">📅</span>
+                <select id="month-select" onchange="navigateMonth()" style="font-size: 0.8rem; padding: 0;">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>
+                        {{ month_names[m] }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <select id="year-select" onchange="navigateMonth()" style="font-size: 0.8rem; padding: 0;">
+                    {% for y in range(current_year - 2, current_year + 2) %}
+                    <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="currency-selector-container" style="margin: 0;">
             <div class="custom-select" id="currency-select-wrapper">
                 <div class="custom-select-trigger" onclick="toggleCurrencyDropdown()">
                     {% if current_currency == 'USD' %}

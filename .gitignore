@@ -24,6 +24,7 @@ wheels/
 # Database
 pulse.db
 *.db-journal
+user_dbs
 
 # Environments
 .env

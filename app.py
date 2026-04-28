@@ -7,9 +7,31 @@ import sqlite3
 import os
 from datetime import datetime, date
 import intelligence
+from dotenv import load_dotenv
+from supabase import create_client, Client
+import jwt
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "pulse-secret-key-change-in-production"
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+def get_supabase() -> Client:
+    """Initialize Supabase client using the auth token from cookies."""
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    
+    # Get the token from cookie
+    access_token = request.cookies.get('sb-access-token')
+    refresh_token = request.cookies.get('sb-refresh-token')
+    
+    if access_token:
+        # Pass the user's session to the python client so RLS works
+        supabase.auth.set_session(access_token, refresh_token)
+        
+    return supabase
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pulse.db")
 
@@ -27,17 +49,80 @@ EXPENSE_CATEGORIES = [
 CATEGORY_MAP = {c["id"]: c for c in EXPENSE_CATEGORIES}
 
 
+USER_DBS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_dbs")
+os.makedirs(USER_DBS_DIR, exist_ok=True)
+
 def get_db():
-    """Get database connection with row factory."""
-    conn = sqlite3.connect(DB_PATH)
+    """Get per-user database connection with row factory. Syncs from Supabase if new."""
+    user_id = "guest"
+    token = request.cookies.get('sb-access-token')
+    if token:
+        try:
+            payload = jwt.decode(token, options={"verify_signature": False})
+            user_id = payload.get("sub", "guest")
+        except:
+            pass
+            
+    db_path = os.path.join(USER_DBS_DIR, f"pulse_{user_id}.db")
+    needs_sync = not os.path.exists(db_path)
+    
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    
+    if needs_sync:
+        init_db(conn)
+        sync_from_supabase(conn)
+        
     return conn
 
+def sync_from_supabase(conn):
+    """Downloads all user data from Supabase and populates the local SQLite cache."""
+    try:
+        supabase = get_supabase()
+        
+        # Sync Settings
+        settings = supabase.table('settings').select('*').execute()
+        for row in settings.data:
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (row['key'], row['value']))
+            
+        # Sync Income
+        income = supabase.table('income').select('*').execute()
+        for row in income.data:
+            conn.execute("INSERT OR REPLACE INTO income (id, amount, source, month, year, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (row['id'], row['amount'], row['source'], row['month'], row['year'], row['note'], row['created_at']))
+                         
+        # Sync Expense
+        expense = supabase.table('expense').select('*').execute()
+        for row in expense.data:
+            conn.execute("INSERT OR REPLACE INTO expense (id, amount, category, description, date, note, is_recurring, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                         (row['id'], row['amount'], row['category'], row['description'], row['date'], row['note'], row['is_recurring'], row['created_at']))
+                         
+        # Sync Budget
+        budget = supabase.table('budget').select('*').execute()
+        for row in budget.data:
+            conn.execute("INSERT OR REPLACE INTO budget (id, category, amount, month, year) VALUES (?, ?, ?, ?, ?)",
+                         (row['id'], row['category'], row['amount'], row['month'], row['year']))
+                         
+        # Sync Drafts
+        drafts = supabase.table('drafts').select('*').execute()
+        for row in drafts.data:
+            conn.execute("INSERT OR REPLACE INTO drafts (id, amount, description, date, category, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (row['id'], row['amount'], row['description'], row['date'], row['category'], row['source'], row['created_at']))
+        
+        conn.commit()
+    except Exception as e:
+        print("Error syncing from Supabase:", e)
 
-def init_db():
+def init_db(conn=None):
     """Initialize database tables."""
-    conn = get_db()
+    close_after = False
+    if conn is None:
+        # Fallback for manual seed scripts
+        db_path = os.path.join(USER_DBS_DIR, "pulse_guest.db")
+        conn = sqlite3.connect(db_path)
+        close_after = True
+        
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS income (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +182,8 @@ def init_db():
     # Insert default settings if not exists
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('currency', 'USD')")
     conn.commit()
-    conn.close()
+    if close_after:
+        conn.close()
 
 
 CURRENCY_RATES = {
@@ -147,8 +233,12 @@ app.jinja_env.filters["currency"] = format_currency
 
 @app.context_processor
 def inject_now():
-    """Inject current datetime into all templates."""
-    return {"now": datetime.utcnow()}
+    """Inject current datetime and supabase config into all templates."""
+    return {
+        "now": datetime.utcnow(),
+        "SUPABASE_URL": SUPABASE_URL,
+        "SUPABASE_KEY": SUPABASE_KEY
+    }
 
 
 # --- Dashboard ---
@@ -458,24 +548,50 @@ def add_income():
     rate = CURRENCY_RATES.get(currency, 1.0)
     usd_amount = amount / rate
 
-    conn = get_db()
     try:
-        conn.execute(
-            "INSERT INTO income (amount, source, month, year, note) VALUES (?, ?, ?, ?, ?)",
-            (usd_amount, source, month, year, note),
-        )
-        conn.commit()
-        flash("Income added successfully!", "success")
-    except sqlite3.IntegrityError:
-        # User requested additive behavior
-        conn.execute(
-            "UPDATE income SET amount = amount + ?, note = COALESCE(note, '') || '\n' || ? WHERE source = ? AND month = ? AND year = ?",
-            (usd_amount, note, source, month, year),
-        )
-        conn.commit()
-        flash("Income added to existing total successfully!", "success")
-    finally:
-        conn.close()
+        supabase = get_supabase()
+        try:
+            supabase.table('income').insert({
+                'amount': usd_amount,
+                'source': source,
+                'month': month,
+                'year': year,
+                'note': note
+            }).execute()
+        except Exception as e:
+            # If unique constraint violated, manually do additive update
+            if "duplicate key" in str(e) or "23505" in str(e):
+                existing = supabase.table('income').select('*').eq('source', source).eq('month', month).eq('year', year).execute()
+                if existing.data:
+                    old_amount = existing.data[0]['amount']
+                    old_note = existing.data[0].get('note') or ''
+                    new_note = f"{old_note}\n{note}" if old_note else note
+                    
+                    supabase.table('income').update({
+                        'amount': old_amount + usd_amount,
+                        'note': new_note
+                    }).eq('id', existing.data[0]['id']).execute()
+
+        # Local SQLite dual-write
+        conn = get_db()
+        try:
+            conn.execute(
+                "INSERT INTO income (amount, source, month, year, note) VALUES (?, ?, ?, ?, ?)",
+                (usd_amount, source, month, year, note),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.execute(
+                "UPDATE income SET amount = amount + ?, note = COALESCE(note, '') || '\n' || ? WHERE source = ? AND month = ? AND year = ?",
+                (usd_amount, note, source, month, year),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        flash("Income added to Supabase & Local successfully!", "success")
+    except Exception as e:
+        flash(f"Error adding income: {str(e)}", "error")
 
     return redirect(url_for("dashboard", month=month, year=year))
 
@@ -483,13 +599,23 @@ def add_income():
 @app.route("/income/delete/<int:income_id>", methods=["POST"])
 def delete_income(income_id):
     """Delete income entry."""
-    conn = get_db()
-    row = conn.execute("SELECT month, year FROM income WHERE id = ?", (income_id,)).fetchone()
-    month, year = (row["month"], row["year"]) if row else (date.today().month, date.today().year)
-    conn.execute("DELETE FROM income WHERE id = ?", (income_id,))
-    conn.commit()
-    conn.close()
-    flash("Income deleted successfully.", "success")
+    try:
+        supabase = get_supabase()
+        supabase.table('income').delete().eq('id', income_id).execute()
+        
+        # Local SQLite dual-write
+        conn = get_db()
+        row = conn.execute("SELECT month, year FROM income WHERE id = ?", (income_id,)).fetchone()
+        month, year = (row["month"], row["year"]) if row else (date.today().month, date.today().year)
+        conn.execute("DELETE FROM income WHERE id = ?", (income_id,))
+        conn.commit()
+        conn.close()
+        
+        flash("Income deleted from Supabase & Local.", "success")
+    except Exception as e:
+        flash(f"Error deleting income: {str(e)}", "error")
+        month, year = date.today().month, date.today().year
+        
     return redirect(url_for("dashboard", month=month, year=year))
 
 
@@ -519,13 +645,29 @@ def add_expense():
     rate = CURRENCY_RATES.get(currency, 1.0)
     usd_amount = amount / rate
 
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO expense (amount, category, description, date, note) VALUES (?, ?, ?, ?, ?)",
-        (usd_amount, category, description, expense_date, note),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        supabase = get_supabase()
+        supabase.table('expense').insert({
+            'amount': usd_amount,
+            'category': category,
+            'description': description,
+            'date': expense_date,
+            'note': note
+        }).execute()
+        
+        # We also need to keep the SQLite one for now so the dashboard doesn't break
+        # (This is temporary until we migrate the dashboard queries)
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO expense (amount, category, description, date, note) VALUES (?, ?, ?, ?, ?)",
+            (usd_amount, category, description, expense_date, note),
+        )
+        conn.commit()
+        conn.close()
+        
+        flash("Expense added to Supabase (and local SQLite for preview)!", "success")
+    except Exception as e:
+        flash(f"Error adding expense: {str(e)}", "error")
 
     parsed_date = datetime.strptime(expense_date, "%Y-%m-%d")
     flash("Expense added successfully!", "success")
@@ -546,35 +688,98 @@ def edit_expense(expense_id):
     rate = CURRENCY_RATES.get(currency, 1.0)
     usd_amount = amount / rate
 
-    conn = get_db()
-    conn.execute(
-        """UPDATE expense SET amount = ?, category = ?, description = ?, date = ?, note = ?
-           WHERE id = ?""",
-        (usd_amount, category, description, expense_date, note, expense_id),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        supabase = get_supabase()
+        supabase.table('expense').update({
+            'amount': usd_amount,
+            'category': category,
+            'description': description,
+            'date': expense_date,
+            'note': note
+        }).eq('id', expense_id).execute()
+
+        # Local SQLite dual-write
+        conn = get_db()
+        conn.execute(
+            """UPDATE expense SET amount = ?, category = ?, description = ?, date = ?, note = ?
+               WHERE id = ?""",
+            (usd_amount, category, description, expense_date, note, expense_id),
+        )
+        conn.commit()
+        conn.close()
+        
+        flash("Expense updated in Supabase & Local!", "success")
+    except Exception as e:
+        flash(f"Error updating expense: {str(e)}", "error")
 
     parsed_date = datetime.strptime(expense_date, "%Y-%m-%d")
-    flash("Expense updated successfully!", "success")
     return redirect(url_for("dashboard", month=parsed_date.month, year=parsed_date.year))
 
 
 @app.route("/expense/delete/<int:expense_id>", methods=["POST"])
 def delete_expense(expense_id):
     """Delete expense transaction."""
-    conn = get_db()
-    row = conn.execute("SELECT date FROM expense WHERE id = ?", (expense_id,)).fetchone()
-    if row:
-        parsed_date = datetime.strptime(row["date"], "%Y-%m-%d")
-        month, year = parsed_date.month, parsed_date.year
-    else:
+    try:
+        supabase = get_supabase()
+        supabase.table('expense').delete().eq('id', expense_id).execute()
+
+        # Local SQLite dual-write
+        conn = get_db()
+        row = conn.execute("SELECT date FROM expense WHERE id = ?", (expense_id,)).fetchone()
+        if row:
+            parsed_date = datetime.strptime(row["date"], "%Y-%m-%d")
+            month, year = parsed_date.month, parsed_date.year
+        else:
+            month, year = date.today().month, date.today().year
+        conn.execute("DELETE FROM expense WHERE id = ?", (expense_id,))
+        conn.commit()
+        conn.close()
+        
+        flash("Expense deleted from Supabase & Local.", "success")
+    except Exception as e:
+        flash(f"Error deleting expense: {str(e)}", "error")
         month, year = date.today().month, date.today().year
-    conn.execute("DELETE FROM expense WHERE id = ?", (expense_id,))
-    conn.commit()
-    conn.close()
-    flash("Expense deleted successfully.", "success")
+        
     return redirect(url_for("dashboard", month=month, year=year))
+
+@app.route("/api/load-dummy-data", methods=["POST"])
+def load_dummy_data():
+    """Loads dummy data into Supabase and resets local cache."""
+    try:
+        supabase = get_supabase()
+        
+        # Insert Income
+        supabase.table('income').insert([
+            {'amount': 5000, 'source': 'Salary', 'month': date.today().month, 'year': date.today().year},
+            {'amount': 1500, 'source': 'Freelance', 'month': date.today().month, 'year': date.today().year}
+        ]).execute()
+        
+        # Insert Expense
+        supabase.table('expense').insert([
+            {'amount': 50, 'category': 'food', 'description': 'Groceries', 'date': date.today().isoformat()},
+            {'amount': 150, 'category': 'utilities', 'description': 'Electricity Bill', 'date': date.today().isoformat()},
+            {'amount': 800, 'category': 'housing', 'description': 'Rent', 'date': date.today().isoformat()},
+            {'amount': 120, 'category': 'entertainment', 'description': 'Netflix & Spotify', 'date': date.today().isoformat()}
+        ]).execute()
+        
+        # Delete local DB so it resyncs on next load
+        user_id = "guest"
+        token = request.cookies.get('sb-access-token')
+        if token:
+            try:
+                payload = jwt.decode(token, options={"verify_signature": False})
+                user_id = payload.get("sub", "guest")
+            except:
+                pass
+        db_path = os.path.join(USER_DBS_DIR, f"pulse_{user_id}.db")
+        if os.path.exists(db_path):
+            os.remove(db_path)
+            
+        flash("Dummy data loaded successfully! Local cache resynced.", "success")
+    except Exception as e:
+        flash(f"Error loading dummy data: {str(e)}", "error")
+        
+    return redirect(url_for("dashboard"))
 
 
 # --- Category Drill-down ---

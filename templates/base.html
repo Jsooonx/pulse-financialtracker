@@ -42,6 +42,96 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = "{{ SUPABASE_URL }}";
+        const SUPABASE_KEY = "{{ SUPABASE_KEY }}";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function updateAuthUI(session) {
+            const authText = document.getElementById('auth-status-text');
+            const authIcon = document.getElementById('auth-status-icon');
+            const authActionBtn = document.getElementById('auth-action-btn');
+            
+            if (!session) return;
+            
+            if (session.user.is_anonymous) {
+                if(authText) authText.innerHTML = "Guest Mode <span style='opacity: 0.5; font-weight: 400; margin-left: 4px;'>· Sign In</span>";
+                if(authIcon) authIcon.textContent = "👤";
+                if(authActionBtn) {
+                    authActionBtn.onclick = signInWithGoogle;
+                    authActionBtn.style.color = "var(--text-primary)";
+                    authActionBtn.style.borderColor = "var(--border-color)";
+                    authActionBtn.style.background = "var(--bg-card)";
+                }
+            } else {
+                const name = session.user.user_metadata?.full_name || session.user.email || "Logged In";
+                if(authText) authText.innerHTML = `${name} <span style='color: var(--danger); font-weight: 400; margin-left: 4px; opacity: 0.8;'>· Log out</span>`;
+                if(authIcon) {
+                    const avatar = session.user.user_metadata?.avatar_url;
+                    if (avatar) {
+                        authIcon.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;"/>`;
+                    } else {
+                        authIcon.textContent = "✓";
+                    }
+                }
+                if(authActionBtn) {
+                    authActionBtn.onclick = () => {
+                        if(confirm('Are you sure you want to log out?')) signOut();
+                    };
+                    authActionBtn.style.color = "var(--text-primary)";
+                    authActionBtn.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                    authActionBtn.style.background = "var(--bg-elevated)";
+                }
+            }
+        }
+
+        async function signInWithGoogle() {
+            const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin + '/'
+                }
+            });
+            if (error) alert("Error signing in: " + error.message);
+        }
+
+        async function signOut() {
+            await supabaseClient.auth.signOut();
+            document.cookie = "sb-access-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "sb-refresh-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.reload();
+        }
+
+        async function initAuth() {
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            
+            if (!session) {
+                // No session found, create an anonymous guest session
+                const { data, error: signInError } = await supabaseClient.auth.signInAnonymously();
+                if (signInError) {
+                    console.error("Auth error:", signInError);
+                } else {
+                    updateAuthUI(data.session);
+                }
+            } else {
+                updateAuthUI(session);
+            }
+        }
+
+        // Keep token in cookies so Flask can read it
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+                document.cookie = `sb-refresh-token=${session.refresh_token}; path=/; max-age=3600; SameSite=Lax`;
+            } else {
+                document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                document.cookie = 'sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            }
+        });
+
+        initAuth();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
