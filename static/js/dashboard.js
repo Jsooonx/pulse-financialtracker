@@ -25,11 +25,11 @@ function selectCurrency(value) {
 function formatCurrency(val) {
     const currency = window.PULSE_CONFIG.currentCurrency;
     if (currency === "IDR") {
-        return "Rp" + val.toLocaleString('id-ID');
+        return "Rp" + Math.round(val).toLocaleString('id-ID');
     } else if (currency === "EUR") {
-        return "€" + val.toLocaleString('de-DE');
+        return "€" + val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } else {
-        return "$" + val.toLocaleString('en-US');
+        return "$" + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 }
 
@@ -173,6 +173,89 @@ function initCharts() {
     }
 }
 
+function initMicroInteractions() {
+    // 1. Grid Entrance Staggering
+    anime({
+        targets: ['.summary-card', '.panel'],
+        translateY: [20, 0],
+        opacity: [0, 1],
+        delay: anime.stagger(100),
+        duration: 800,
+        easing: 'easeOutQuint'
+    });
+
+    // 2. Financial Metrics Count Up
+    document.querySelectorAll('.card-amount[data-value]').forEach(el => {
+        const finalVal = parseFloat(el.getAttribute('data-value'));
+        if(isNaN(finalVal)) return;
+        
+        const obj = { val: 0 };
+        anime({
+            targets: obj,
+            val: finalVal,
+            round: 1,
+            duration: 1500,
+            easing: 'easeOutExpo',
+            update: function() {
+                el.textContent = formatCurrency(obj.val);
+            },
+            complete: function() {
+                el.textContent = formatCurrency(finalVal);
+            }
+        });
+    });
+
+    // 3. Magnetic Grid Interaction (Cards)
+    document.querySelectorAll('.summary-card').forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            anime({
+                targets: card,
+                scale: 1.02,
+                translateY: -4,
+                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
+                duration: 400,
+                easing: 'easeOutElastic(1, .6)'
+            });
+        });
+        card.addEventListener('mouseleave', () => {
+            anime({
+                targets: card,
+                scale: 1,
+                translateY: 0,
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0)',
+                duration: 600,
+                easing: 'easeOutElastic(1, .6)'
+            });
+        });
+    });
+
+    // 4. Staggered Entrance for Lists
+    anime({
+        targets: ['.category-item', '.transaction-item', '.income-item'],
+        translateX: [-15, 0],
+        opacity: [0, 1],
+        delay: anime.stagger(50, {start: 400}),
+        duration: 600,
+        easing: 'easeOutQuart'
+    });
+
+    // 5. Feedback/Actions (Button Ripple/Success)
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            const btn = form.querySelector('button[type="submit"]');
+            if(btn && !btn.classList.contains('btn-icon')) {
+                btn.innerHTML = '✨ Processing...';
+                anime({
+                    targets: btn,
+                    scale: [1, 0.95, 1],
+                    duration: 400,
+                    easing: 'easeInOutSine'
+                });
+            }
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Currency outside click
     document.addEventListener('click', (e) => {
@@ -183,4 +266,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initCharts();
+    initMicroInteractions();
 });

@@ -262,15 +262,15 @@ a:hover {
     padding: var(--space-xl);
     position: relative;
     overflow: hidden;
-    transition: all var(--transition-normal);
+    transition: background var(--transition-normal), border-color var(--transition-normal);
+    opacity: 0; /* Handled by Anime.js */
     box-sizing: border-box;
 }
 
 .summary-card:hover {
     background: var(--bg-card-hover);
     border-color: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    /* Transform and shadow handled by Anime.js for magnetic effect */
 }
 
 .summary-card::before {
@@ -347,7 +347,7 @@ a:hover {
     border-radius: var(--radius-lg);
     padding: var(--space-xl);
     transition: background var(--transition-normal);
-    animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0; /* Handled by Anime.js */
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
@@ -434,6 +434,7 @@ a:hover {
     cursor: pointer;
     text-decoration: none;
     color: var(--text-primary);
+    opacity: 0; /* Handled by Anime.js */
 }
 
 .category-item:hover {
@@ -498,6 +499,7 @@ a:hover {
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     transition: all var(--transition-fast);
+    opacity: 0; /* Handled by Anime.js */
 }
 
 .transaction-item:hover {
@@ -826,6 +828,7 @@ input[name="category_radio"] {
     border-radius: var(--radius-md);
     border: 1px solid var(--border-subtle);
     transition: all var(--transition-fast);
+    opacity: 0; /* Handled by Anime.js */
 }
 
 .income-item:hover {
@@ -1287,6 +1290,7 @@ input[name="category_radio"] {
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     transition: all var(--transition-fast);
+    opacity: 0; /* Handled by Anime.js */
 }
 
 .recurring-item:hover {

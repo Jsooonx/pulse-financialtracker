@@ -78,26 +78,26 @@
 <div class="summary-grid">
     <div class="summary-card" style="border-top: 3px solid var(--accent-primary);">
         <div class="card-label">Total Net Worth</div>
-        <div class="card-amount">{{ net_worth | currency }}</div>
+        <div class="card-amount" data-value="{{ net_worth * currency_rates[current_currency] }}">{{ net_worth | currency }}</div>
         <div class="card-sub">All-time balance</div>
     </div>
     <div class="summary-card income">
         <div class="card-label">Monthly Income</div>
-        <div class="card-amount">{{ total_income | currency }}</div>
+        <div class="card-amount" data-value="{{ total_income * currency_rates[current_currency] }}">{{ total_income | currency }}</div>
         <div class="card-sub" style="color: {% if mom_income >= 0 %}var(--success){% else %}var(--danger){% endif %};">
             {% if mom_income > 0 %}↑{% elif mom_income < 0 %}↓{% else %}-{% endif %} {{ "%.1f" | format(mom_income|abs) }}% vs last mo
         </div>
     </div>
     <div class="summary-card expense">
         <div class="card-label">Monthly Expenses</div>
-        <div class="card-amount">{{ total_expense | currency }}</div>
+        <div class="card-amount" data-value="{{ total_expense * currency_rates[current_currency] }}">{{ total_expense | currency }}</div>
         <div class="card-sub" style="color: {% if mom_expense <= 0 %}var(--success){% else %}var(--danger){% endif %};">
             {% if mom_expense > 0 %}↑{% elif mom_expense < 0 %}↓{% else %}-{% endif %} {{ "%.1f" | format(mom_expense|abs) }}% vs last mo
         </div>
     </div>
     <div class="summary-card balance">
         <div class="card-label">Monthly Balance</div>
-        <div class="card-amount">{{ balance | currency }}</div>
+        <div class="card-amount" data-value="{{ balance * currency_rates[current_currency] }}">{{ balance | currency }}</div>
         <div class="card-sub">
             {% if total_income > 0 %}
                 {{ "%.0f" | format((total_expense / total_income) * 100) }}% of income used
