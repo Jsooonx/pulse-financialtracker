@@ -638,7 +638,6 @@ a:hover {
     z-index: 1000;
     align-items: center;
     justify-content: center;
-    animation: fadeIn 0.2s ease;
 }
 
 .modal-overlay.active {
@@ -654,7 +653,6 @@ a:hover {
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: var(--shadow-lg);
-    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-header {

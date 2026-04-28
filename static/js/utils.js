@@ -8,10 +8,35 @@
  * @param {string} id - The ID of the modal overlay element
  */
 function openModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.add('active');
+    const modalOverlay = document.getElementById(id);
+    if (modalOverlay) {
+        modalOverlay.style.opacity = 0;
+        modalOverlay.classList.add('active');
         document.body.style.overflow = 'hidden';
+        
+        const modal = modalOverlay.querySelector('.modal');
+        if (modal) {
+            modal.style.opacity = 0;
+            modal.style.transform = 'translateY(20px) scale(0.95)';
+        }
+
+        anime({
+            targets: modalOverlay,
+            opacity: [0, 1],
+            duration: 250,
+            easing: 'linear'
+        });
+
+        if (modal) {
+            anime({
+                targets: modal,
+                opacity: [0, 1],
+                translateY: [20, 0],
+                scale: [0.95, 1],
+                duration: 400,
+                easing: 'easeOutQuint'
+            });
+        }
     }
 }
 
@@ -20,9 +45,35 @@ function openModal(id) {
  * @param {string} id - The ID of the modal overlay element
  */
 function closeModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.remove('active');
+    const modalOverlay = document.getElementById(id);
+    if (modalOverlay) {
+        const modal = modalOverlay.querySelector('.modal');
+        
+        anime({
+            targets: modalOverlay,
+            opacity: [1, 0],
+            duration: 250,
+            easing: 'linear',
+            complete: () => {
+                modalOverlay.classList.remove('active');
+                modalOverlay.style.opacity = '';
+            }
+        });
+
+        if (modal) {
+            anime({
+                targets: modal,
+                opacity: [1, 0],
+                translateY: [0, 15],
+                scale: [1, 0.95],
+                duration: 250,
+                easing: 'easeInQuint',
+                complete: () => {
+                    modal.style.transform = '';
+                    modal.style.opacity = '';
+                }
+            });
+        }
         document.body.style.overflow = '';
     }
 }
@@ -59,8 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                overlay.classList.remove('active');
-                document.body.style.overflow = '';
+                closeModal(overlay.id);
             }
         });
     });
@@ -69,10 +119,50 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.modal-overlay.active').forEach(m => {
-                m.classList.remove('active');
+                closeModal(m.id);
             });
-            document.body.style.overflow = '';
         }
+    });
+
+    // Input focus micro-interactions
+    document.querySelectorAll('.form-input, .form-textarea').forEach(input => {
+        input.addEventListener('focus', () => {
+            anime({
+                targets: input,
+                scale: 1.01,
+                boxShadow: '0 0 0 2px rgba(167, 139, 250, 0.3)',
+                duration: 250,
+                easing: 'easeOutSine'
+            });
+            const label = input.previousElementSibling;
+            if (label && label.classList.contains('form-label')) {
+                anime({
+                    targets: label,
+                    color: '#A78BFA',
+                    duration: 250,
+                    easing: 'easeOutSine'
+                });
+            }
+        });
+        
+        input.addEventListener('blur', () => {
+            anime({
+                targets: input,
+                scale: 1,
+                boxShadow: '0 0 0 0px rgba(167, 139, 250, 0)',
+                duration: 250,
+                easing: 'easeOutSine'
+            });
+            const label = input.previousElementSibling;
+            if (label && label.classList.contains('form-label')) {
+                anime({
+                    targets: label,
+                    color: '#9c9480',
+                    duration: 250,
+                    easing: 'easeOutSine'
+                });
+            }
+        });
     });
 });
 

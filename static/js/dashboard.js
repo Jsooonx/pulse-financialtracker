@@ -5,7 +5,19 @@
 function navigateMonth() {
     const month = document.getElementById('month-select').value;
     const year = document.getElementById('year-select').value;
-    window.location.href = `/?month=${month}&year=${year}`;
+    
+    // Contextual Exit Transition
+    anime({
+        targets: ['.summary-card', '.panel', '.sankey-mobile-flow'],
+        opacity: [1, 0],
+        translateY: [0, -10],
+        duration: 300,
+        easing: 'easeInQuad',
+        delay: anime.stagger(30, {direction: 'reverse'}),
+        complete: function() {
+            window.location.href = `/?month=${month}&year=${year}`;
+        }
+    });
 }
 
 function toggleCurrencyDropdown() {
@@ -254,6 +266,7 @@ function initMicroInteractions() {
             }
         });
     });
+
 }
 
 document.addEventListener('DOMContentLoaded', () => {
