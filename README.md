@@ -6,7 +6,7 @@ Pulse is a proactive personal finance application that goes beyond passive track
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square)
 ![Flask](https://img.shields.io/badge/Flask-3.1-green?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-orange?style=flat-square)
+![Anime.js](https://img.shields.io/badge/Anime.js-3.2-orange?style=flat-square)
 ![SQLite](https://img.shields.io/badge/SQLite-3.41-blue?style=flat-square)
 ![Chart.js](https://img.shields.io/badge/Chart.js-4.4-blue?style=flat-square)
 
@@ -16,7 +16,20 @@ Pulse is a proactive personal finance application that goes beyond passive track
 
 ---
 
-## ⚡ Hosting & Free Tier Limitations
+## High-Craft Micro-interactions
+
+Pulse features a bespoke animation system powered by **Anime.js**, designed to provide a premium, "Apple-inspired" tactile experience:
+
+- **Metric Count-Up**: Financial figures animate smoothly from zero to their target value on page load.
+- **Magnetic Grid**: Summary cards respond to your cursor with a subtle spring-based tilt and scale effect.
+- **Staggered Entry**: All layout components, lists, and transaction items slide into view with a sequential, cinematic flow.
+- **Cinematic Modals**: Ultra-smooth scaling and opacity transitions for all interaction dialogs.
+- **Contextual Page Transitions**: Staggered exit animations when navigating between months or categories to prevent harsh "hard reloads."
+- **Tactile Inputs**: Interactive focus states for form fields with subtle scaling and glow effects.
+
+---
+
+## Hosting & Free Tier Limitations
 
 Pulse is designed to be highly interactive, especially with its **Telegram Bot (Pulsar)**. Running a bot 24/7 requires a continuous background process (polling).
 
@@ -28,7 +41,7 @@ Pulse is designed to be highly interactive, especially with its **Telegram Bot (
 
 ---
 
-## 🚀 Local Setup Guide
+## Local Setup Guide
 
 Follow these steps to get Pulse running on your own computer:
 
@@ -51,10 +64,10 @@ TELEGRAM_CHAT_ID=your_personal_chat_id # Optional for auto-summaries
 ```
 
 ### 4. Database Initialization
-Initialize the database and populate it with sample data:
+Initialize the database. You can optionally populate it with sample data if you want to test the dashboard immediately:
 ```bash
 python -c "from app import init_db; init_db()"
-python seed.py
+python seed.py  # Optional: Only run this if you want dummy data for testing
 ```
 
 ### 5. Running the Application
@@ -74,19 +87,19 @@ python bot.py
 
 ---
 
-## ✨ Key Features
+## Premium Features
 
-- **Monthly Budgeting & Proactive Alerts**: Set month-specific spending targets for each category. Pulse keeps track and proactively warns you via Telegram when you reach 80% or 100% of your budget.
-- **Multi-Currency Engine**: Full support for **USD ($)**, **EUR (€)**, and **IDR (Rp)**. All data is stored in a USD base for consistency.
-- **Drafts Inbox (Telegram Text)**: A built-in staging area for incoming transactions. Send messages like `"Starbucks 25k idr"` to your bot and approve them in the dashboard.
-- **6-Month Spending Trend**: High-fidelity visualization of your Income vs. Expense history.
-- **Local Intelligence**: Natural language parsing that extracts amounts and categories automatically without external APIs.
-- **Professional Reporting**: Export your data to **Excel (.xlsx)** for a beautifully styled report with headers, zebra stripes, and auto-formatting, or to **CSV** for raw data processing.
-- **Premium Aesthetic**: A bespoke "Teal Forest & Vanilla Latte" UI/UX designed for modern financial management.
+- **Apple-inspired "Digital Editorial" Aesthetic**: A bespoke Bento Grid layout featuring a "Teal Forest & Vanilla Latte" palette, designed for maximum clarity and high-end feel.
+- **Pulse Intelligence**: A proactive layer that evaluates your finances against the **50/30/20 benchmark**, detects anomalies, and provides dynamic textual insights.
+- **Cashflow Flow (Sankey)**: A high-fidelity visualization mapping your income sources directly to your expenses and savings.
+- **Smart Paste (AI-Powered Stage)**: Paste raw bank emails or free-text messages directly into the dashboard. Pulse extracts amounts, dates, and categories with zero external API calls.
+- **Recurring Manager**: Effortlessly automate monthly subscriptions, rent, or utilities.
+- **Multi-Currency Engine**: Native support for **USD ($)**, **EUR (€)**, and **IDR (Rp)** with localized formatting and accurate internal conversion.
+- **Professional Reporting**: Export beautifully styled **Excel (.xlsx)** reports with auto-formatting or clean **CSV** for data nerds.
 
 ---
 
-## 🤖 Telegram Bot (Pulsar) Commands
+## Telegram Bot (Pulsar) Commands
 
 - `/start` - Introduction and help.
 - `/add [desc] [amount] [currency]` - Quick log (e.g., `/add coffee 5 usd`).
@@ -95,25 +108,6 @@ python bot.py
 - `/undo` - Remove the very last transaction added.
 - `/setbudget [category] [amount] [currency]` - Set a monthly spending target.
 - `/insight` - Real-time Pulse Intelligence report.
-- `/clearbudget [category]` - Remove a specific budget. Call without arguments to see all active budgets.
-
-### 🤖 Bot Previews
-| Start / Help | Add Expense | Income Log |
-| :---: | :---: | :---: |
-| ![Start](static/images/start.png) | ![Add](static/images/add.png) | ![Income](static/images/income.png) |
-
-| Summary | History | Intelligence |
-| :---: | :---: | :---: |
-| ![Summary](static/images/summary.png) | ![History](static/images/history.png) | ![Insight](static/images/insight.png) |
-
-### 🌐 Web Dashboard Previews
-| Budgeting Modal | Currency Settings |
-| :---: | :---: |
-| ![Budgets](static/images/web_budgets.png) | ![Currency](static/images/web_currency.png) |
-
-| Transaction Form | Income Management |
-| :---: | :---: |
-| ![Expense](static/images/web_expense.png) | ![Income](static/images/web_income.png) |
 
 ---
 *Created by Jsooonx for Portfolio | 2026*
