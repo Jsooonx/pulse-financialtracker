@@ -1396,19 +1396,27 @@ def export_excel():
 
 # --- Telegram Webhook Implementation ---
 bot_app = bot.create_bot_app()
+is_initialized = False
 
 @app.route('/webhook', methods=['POST'])
 async def webhook():
     """Handle incoming Telegram updates."""
+    global is_initialized
     if request.method == "POST":
         try:
             update = Update.de_json(request.get_json(force=True), bot_app.bot)
-            await bot_app.initialize()
+            
+            # Only initialize once per instance lifecycle
+            if not is_initialized:
+                await bot_app.initialize()
+                is_initialized = True
+                
             await bot_app.process_update(update)
             return "ok", 200
         except Exception as e:
             print(f"Webhook Error: {e}")
             return str(e), 500
+
 
 @app.route('/set_webhook', methods=['GET'])
 async def set_webhook():
