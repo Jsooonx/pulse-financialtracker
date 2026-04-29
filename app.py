@@ -1423,6 +1423,8 @@ async def set_webhook():
     """One-time route to register the webhook URL with Telegram."""
     webhook_url = f"{request.url_root.replace('http://', 'https://')}webhook"
     try:
+        # Ensure bot is initialized
+        await bot_app.initialize()
         success = await bot_app.bot.set_webhook(webhook_url)
         if success:
             return f"✅ Webhook successfully set to: {webhook_url}", 200
@@ -1434,12 +1436,15 @@ async def set_webhook():
 async def unset_webhook():
     """One-time route to remove the webhook URL (use this when moving to Koyeb/Polling)."""
     try:
+        # Ensure bot is initialized
+        await bot_app.initialize()
         success = await bot_app.bot.delete_webhook()
         if success:
-            return "✅ Webhook successfully deleted. You can now use Polling (Koyeb)!", 200
+            return "✅ Webhook successfully deleted. You can now use Polling (Koyeb/PythonAnywhere)!", 200
         return "❌ Failed to delete webhook", 400
     except Exception as e:
         return f"❌ Error: {str(e)}", 500
+
 
 
 if __name__ == "__main__":
