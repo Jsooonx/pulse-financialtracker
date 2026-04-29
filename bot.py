@@ -184,7 +184,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not user_id:
         msg += "⚠️ *NOT LINKED:*\nYour Telegram is not linked to your Pulse Cloud account.\nClick the button below to link it!"
-        keyboard = [[InlineKeyboardButton("🔗 Link Pulse Account", url=f"http://127.0.0.1:5000/link-telegram?chat_id={chat_id}")]]
+        base_url = os.getenv('WEB_APP_URL', 'http://127.0.0.1:5000').rstrip('/')
+        keyboard = [[InlineKeyboardButton("🔗 Link Pulse Account", url=f"{base_url}/link-telegram?chat_id={chat_id}")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
     else:
