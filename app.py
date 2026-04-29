@@ -19,6 +19,11 @@ app.secret_key = "pulse-secret-key-change-in-production"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
+@app.context_processor
+def inject_supabase():
+    return dict(SUPABASE_URL=SUPABASE_URL, SUPABASE_KEY=SUPABASE_KEY, now=datetime.now())
+
+
 def get_supabase() -> Client:
     """Initialize Supabase client using the auth token from cookies."""
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
