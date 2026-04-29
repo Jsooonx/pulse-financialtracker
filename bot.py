@@ -491,17 +491,22 @@ async def add_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
 
     # 1. Write to Supabase (Cloud)
-    try:
-        supabase = get_supabase()
-        supabase.table('expense').insert({
-            'amount': amount_usd,
-            'category': category,
-            'description': description,
-            'date': today,
-            'note': f"Added via bot ({amount_local:,.0f} {currency.upper()})"
-        }).execute()
-    except Exception as e:
-        print(f"Failed to sync to Supabase: {e}")
+    user_id = get_user_id_from_chat(chat_id)
+    if user_id:
+        try:
+            supabase = get_supabase()
+            supabase.table('expense').insert({
+                'user_id': user_id,
+                'amount': amount_usd,
+                'category': category,
+                'description': description,
+                'date': today,
+                'note': f"Added via bot ({amount_local:,.0f} {currency.upper()})"
+            }).execute()
+        except Exception as e:
+            print(f"Failed to sync expense to Supabase: {e}")
+    else:
+        print(f"No user_id found for chat_id {chat_id}, skipping Supabase sync.")
 
     # 2. Write to Local DB (for instant bot feedback)
     conn = get_db(chat_id)
@@ -569,17 +574,22 @@ async def add_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
     month, year = now.month, now.year
 
     # 1. Write to Supabase (Cloud)
-    try:
-        supabase = get_supabase()
-        supabase.table('income').insert({
-            'amount': amount_usd,
-            'source': source,
-            'month': month,
-            'year': year,
-            'note': f"Added via bot ({amount_local:,.0f} {currency.upper()})"
-        }).execute()
-    except Exception as e:
-        print(f"Failed to sync to Supabase: {e}")
+    user_id = get_user_id_from_chat(chat_id)
+    if user_id:
+        try:
+            supabase = get_supabase()
+            supabase.table('income').insert({
+                'user_id': user_id,
+                'amount': amount_usd,
+                'source': source,
+                'month': month,
+                'year': year,
+                'note': f"Added via bot ({amount_local:,.0f} {currency.upper()})"
+            }).execute()
+        except Exception as e:
+            print(f"Failed to sync income to Supabase: {e}")
+    else:
+        print(f"No user_id found for chat_id {chat_id}, skipping Supabase sync.")
 
     # 2. Write to Local DB (for instant bot feedback)
     conn = get_db(chat_id)
