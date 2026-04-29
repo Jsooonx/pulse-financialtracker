@@ -18,7 +18,13 @@ SUPABASE_URL = os.getenv('SUPABASE_URL')
 # Use service role key if available for bot backend operations
 SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_KEY') or os.getenv('SUPABASE_KEY')
 
-USER_DBS_DIR = os.path.join(os.path.dirname(__file__), 'user_dbs')
+# Use /tmp for SQLite on Vercel (read-only filesystem otherwise)
+if os.environ.get('VERCEL'):
+    USER_DBS_DIR = '/tmp/user_dbs'
+else:
+    USER_DBS_DIR = os.path.join(os.path.dirname(__file__), 'user_dbs')
+
+os.makedirs(USER_DBS_DIR, exist_ok=True)
 
 
 CURRENCY_RATES = {'USD': 1.0, 'EUR': 0.86, 'IDR': 17000.0}
@@ -835,7 +841,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
 
-def main():
+def create_bot_app():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -858,6 +864,10 @@ def main():
     app.add_handler(CommandHandler("delrecurring", del_recurring))
     # --- Smart Parse lives in handle_text ---
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    return app
+
+def main():
+    app = create_bot_app()
     print("Pulsar bot is running...")
     app.run_polling()
 

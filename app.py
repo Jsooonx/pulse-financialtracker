@@ -10,6 +10,10 @@ import intelligence
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import jwt
+import json
+from telegram import Update
+import bot
+
 
 load_dotenv()
 
@@ -54,7 +58,12 @@ EXPENSE_CATEGORIES = [
 CATEGORY_MAP = {c["id"]: c for c in EXPENSE_CATEGORIES}
 
 
-USER_DBS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_dbs")
+# Use /tmp for SQLite on Vercel
+if os.environ.get('VERCEL'):
+    USER_DBS_DIR = '/tmp/user_dbs'
+else:
+    USER_DBS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_dbs")
+
 os.makedirs(USER_DBS_DIR, exist_ok=True)
 
 def get_db():
@@ -1385,6 +1394,34 @@ def export_excel():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
+# --- Telegram Webhook Implementation ---
+bot_app = bot.create_bot_app()
+
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    """Handle incoming Telegram updates."""
+    if request.method == "POST":
+        try:
+            update = Update.de_json(request.get_json(force=True), bot_app.bot)
+            await bot_app.initialize()
+            await bot_app.process_update(update)
+            return "ok", 200
+        except Exception as e:
+            print(f"Webhook Error: {e}")
+            return str(e), 500
+
+@app.route('/set_webhook', methods=['GET'])
+async def set_webhook():
+    """One-time route to register the webhook URL with Telegram."""
+    webhook_url = f"{request.url_root.replace('http://', 'https://')}webhook"
+    try:
+        success = await bot_app.bot.set_webhook(webhook_url)
+        if success:
+            return f"✅ Webhook successfully set to: {webhook_url}", 200
+        return "❌ Failed to set webhook", 400
+    except Exception as e:
+        return f"❌ Error: {str(e)}", 500
+
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
+
