@@ -1440,7 +1440,8 @@ async def unset_webhook():
         await bot_app.initialize()
         success = await bot_app.bot.delete_webhook()
         if success:
-            return "✅ Webhook successfully deleted. You can now use Polling (Koyeb/PythonAnywhere)!", 200
+            return "✅ Webhook successfully deleted. You can now use Polling mode (PythonAnywhere, etc.)!", 200
+
         return "❌ Failed to delete webhook", 400
     except Exception as e:
         return f"❌ Error: {str(e)}", 500

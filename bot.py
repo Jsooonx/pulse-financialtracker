@@ -92,17 +92,64 @@ def get_user_id_from_chat(chat_id):
                 continue
     return None
 
+def init_user_db(conn):
+    """Ensure all required tables exist in the user's database."""
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expense (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            date TEXT NOT NULL,
+            description TEXT,
+            note TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS income (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount REAL NOT NULL,
+            source TEXT NOT NULL,
+            month INTEGER NOT NULL,
+            year INTEGER NOT NULL,
+            note TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budget (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            amount REAL NOT NULL,
+            month INTEGER NOT NULL,
+            year INTEGER NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
+    conn.commit()
+
 def get_db(chat_id=None):
     """Get the SQLite connection for the user."""
+    db_path = None
     if chat_id:
         user_id = get_user_id_from_chat(chat_id)
         if user_id:
-            return sqlite3.connect(os.path.join(USER_DBS_DIR, f"pulse_{user_id}.db"))
-    # Fallback to guest/old db
-    fallback = os.path.join(USER_DBS_DIR, "pulse_guest.db")
-    if not os.path.exists(fallback):
-        fallback = os.path.join(os.path.dirname(__file__), 'pulse.db')
-    return sqlite3.connect(fallback)
+            db_path = os.path.join(USER_DBS_DIR, f"pulse_{user_id}.db")
+    
+    if not db_path:
+        # Fallback to guest/old db
+        db_path = os.path.join(USER_DBS_DIR, "pulse_guest.db")
+        if not os.path.exists(db_path):
+            db_path = os.path.join(os.path.dirname(__file__), 'pulse.db')
+            
+    conn = sqlite3.connect(db_path)
+    init_user_db(conn)
+    return conn
+
 
 def parse_amount(text):
     text = text.lower().strip()
