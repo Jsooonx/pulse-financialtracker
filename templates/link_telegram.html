@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-grid" style="display: flex; justify-content: center; align-items: center; min-height: 70vh;">
+    <div class="glass-card fade-in" style="max-width: 400px; text-align: center; padding: 40px;">
+        
+        <div style="font-size: 3rem; margin-bottom: 20px;">
+            {% if status == 'success' %}
+                ✅
+            {% elif status == 'login_required' %}
+                🔐
+            {% else %}
+                ❌
+            {% endif %}
+        </div>
+
+        <h2 style="font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--text-primary); margin-bottom: 15px;">
+            {{ title }}
+        </h2>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 30px; font-size: 0.95rem; line-height: 1.5;">
+            {{ message }}
+        </p>
+
+        {% if status == 'login_required' %}
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px;">
+                You need to log into your Pulse account before we can link your Telegram Bot.
+            </p>
+        {% elif status == 'success' %}
+            <a href="https://t.me/pulsar_finance_bot" target="_blank" style="display: inline-block; background: var(--text-primary); color: var(--bg-primary) !important; padding: 10px 24px; border-radius: 30px; text-decoration: none; font-weight: 700; border: none; outline: none; cursor: pointer; box-shadow: var(--shadow-md);">
+                Return to Telegram
+            </a>
+        {% endif %}
+        
+        {% if status != 'login_required' %}
+            <div style="margin-top: 20px;">
+                <a href="{{ url_for('dashboard') }}" style="color: var(--text-tertiary); text-decoration: none; font-size: 0.85rem;">
+                    Go to Dashboard
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if status == 'login_required' %}
+<script>
+    // Trigger login automatically if they hit this page but aren't logged in
+    document.addEventListener("DOMContentLoaded", function() {
+        if(typeof signInWithGoogle === "function") {
+            // Optional: prompt them or let them click the nav button
+            // signInWithGoogle(); 
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

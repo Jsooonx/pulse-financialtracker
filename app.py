@@ -618,6 +618,58 @@ def delete_income(income_id):
         
     return redirect(url_for("dashboard", month=month, year=year))
 
+# --- Telegram Link ---
+@app.route("/link-telegram")
+def link_telegram():
+    """Link a Telegram Chat ID to the current Supabase Account."""
+    chat_id = request.args.get("chat_id")
+    if not chat_id:
+        return render_template("link_telegram.html", status="error", title="Invalid Link", message="Missing Telegram Chat ID. Please click the link directly from the bot."), 400
+        
+    # Check if user is logged in
+    token = request.cookies.get('sb-access-token')
+    if not token:
+        # Save chat_id in session/cookie and show a beautiful login required page
+        response = render_template("link_telegram.html", status="login_required", title="Authentication Required", message="We need to securely connect your Telegram to your Pulse Cloud.")
+        res = Response(response)
+        res.set_cookie("pending_telegram_link", chat_id, max_age=3600)
+        return res
+        
+    try:
+        supabase = get_supabase()
+        # Save chat_id to user settings in Supabase
+        supabase.table('settings').upsert({
+            'key': 'telegram_chat_id',
+            'value': str(chat_id)
+        }).execute()
+        
+        # Save locally
+        conn = get_db()
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ('telegram_chat_id', str(chat_id)))
+        conn.commit()
+        conn.close()
+        
+        # Notify the user on Telegram
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        if bot_token:
+            import requests
+            try:
+                requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": "🎉 *Account linked successfully!*\n\nType /help to learn about all the commands you can use.",
+                        "parse_mode": "Markdown"
+                    },
+                    timeout=5
+                )
+            except Exception as e:
+                print(f"Failed to send Telegram notification: {e}")
+        
+        return render_template("link_telegram.html", status="success", title="Account Linked", message=f"Telegram device ({chat_id}) is now connected to your Pulse account.")
+    except Exception as e:
+        return render_template("link_telegram.html", status="error", title="Link Failed", message=f"An error occurred: {str(e)}"), 500
+
 
 # --- Expense CRUD ---
 @app.route("/expense/add", methods=["POST"])

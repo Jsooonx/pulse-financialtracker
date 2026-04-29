@@ -4,8 +4,9 @@ import sqlite3
 import re
 from datetime import datetime, date
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from supabase import create_client
 
 # Import shared intelligence layer
 sys.path.insert(0, os.path.dirname(__file__))
@@ -13,7 +14,12 @@ import intelligence
 
 load_dotenv()
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-DB_PATH = os.path.join(os.path.dirname(__file__), 'pulse.db')
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+# Use service role key if available for bot backend operations
+SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_KEY') or os.getenv('SUPABASE_KEY')
+
+USER_DBS_DIR = os.path.join(os.path.dirname(__file__), 'user_dbs')
+
 
 CURRENCY_RATES = {'USD': 1.0, 'EUR': 0.86, 'IDR': 17000.0}
 
@@ -58,8 +64,39 @@ CATEGORY_KEYWORDS = {
 
 BOT_CURRENCY_RATES = {'idr': 1/17000, 'usd': 1, 'eur': 1.08}
 
-def get_db():
-    return sqlite3.connect(DB_PATH)
+def get_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def get_user_id_from_chat(chat_id):
+    """Scan local user DBs to find which one has this Telegram chat_id linked."""
+    if not os.path.exists(USER_DBS_DIR):
+        return None
+        
+    for filename in os.listdir(USER_DBS_DIR):
+        if filename.startswith('pulse_') and filename.endswith('.db'):
+            db_path = os.path.join(USER_DBS_DIR, filename)
+            try:
+                conn = sqlite3.connect(db_path)
+                row = conn.execute("SELECT value FROM settings WHERE key='telegram_chat_id'").fetchone()
+                conn.close()
+                if row and str(row[0]) == str(chat_id):
+                    # extract user_id from pulse_<user_id>.db
+                    return filename[6:-3]
+            except:
+                continue
+    return None
+
+def get_db(chat_id=None):
+    """Get the SQLite connection for the user."""
+    if chat_id:
+        user_id = get_user_id_from_chat(chat_id)
+        if user_id:
+            return sqlite3.connect(os.path.join(USER_DBS_DIR, f"pulse_{user_id}.db"))
+    # Fallback to guest/old db
+    fallback = os.path.join(USER_DBS_DIR, "pulse_guest.db")
+    if not os.path.exists(fallback):
+        fallback = os.path.join(os.path.dirname(__file__), 'pulse.db')
+    return sqlite3.connect(fallback)
 
 def parse_amount(text):
     text = text.lower().strip()
@@ -93,10 +130,23 @@ def convert_to_usd(amount, currency):
     rate = BOT_CURRENCY_RATES.get(currency, 1)
     return amount * rate
 
-def parse_transaction_parts(tokens):
+def get_user_currency(chat_id):
+    try:
+        conn = get_db(chat_id)
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = 'default_currency'")
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0].lower()
+    except Exception:
+        pass
+    return 'idr' # Default to IDR if not set
+
+def parse_transaction_parts(tokens, chat_id):
     """Shared helper to parse amount, currency and description/source from tokens."""
     amount_raw = None
-    currency = 'usd'
+    currency = None
     other_tokens = []
 
     for token in tokens:
@@ -106,6 +156,9 @@ def parse_transaction_parts(tokens):
             currency = token.lower()
         else:
             other_tokens.append(token)
+            
+    if not currency:
+        currency = get_user_currency(chat_id)
     
     amount_local = parse_amount(amount_raw) if amount_raw else None
     description = ' '.join(other_tokens) if other_tokens else ''
@@ -113,42 +166,145 @@ def parse_transaction_parts(tokens):
     return amount_local, currency, description
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    user_id = get_user_id_from_chat(chat_id)
+    
     msg = (
         "⚡ *Welcome to Pulsar* - Pulse Finance Intelligence\n\n"
         "📝 *Record Transactions*\n"
         "• `/add [desc] [amt] [curr]` - Log expense\n"
-        "  _e.g. `/add Starbucks 55k idr`_\n"
-        "• `/income [src] [amt] [curr]` - Log income\n"
-        "  _e.g. `/income Salary 5000 usd`_\n\n"
-
+        "• `/income [src] [amt] [curr]` - Log income\n\n"
         "🏦 *Smart Parse (NEW!)*\n"
-        "Just paste or forward your bank email / SMS notification and I will auto-extract the amount, vendor, date and category for you!\n"
-        "Works with: BCA myBCA, or any format containing *Total Bayar*.\n\n"
-
-        "🔁 *Recurring Rules (NEW!)*\n"
-        "• `/recurring` - List all recurring rules\n"
-        "• `/addrecurring [desc] [amt] [curr] [day]` - Add auto-expense\n"
-        "  _e.g. `/addrecurring Netflix 180k idr 1`_\n"
-        "• `/delrecurring [id]` - Delete a rule by ID\n\n"
-
+        "Paste your bank email / SMS and I will auto-extract it!\n\n"
         "📊 *Analysis*\n"
         "• `/summary` - Monthly balance + budget bars\n"
         "• `/insight` - Financial score + 50/30/20\n"
         "• `/history` - Last 10 transactions\n\n"
-
-        "⚙️ *Manage*\n"
-        "• `/undo` - Delete last expense\n"
-        "• `/setbudget [cat] [amt] [curr]` - Set spending limit\n"
-        "• `/clearbudget [cat?]` - View / clear budgets\n\n"
-
-        "💡 *Tip:* Type anything with a number (e.g. `lunch 25000`) and I will parse it automatically!"
     )
-    await update.message.reply_text(msg, parse_mode='Markdown')
+    
+    if not user_id:
+        msg += "⚠️ *NOT LINKED:*\nYour Telegram is not linked to your Pulse Cloud account.\nClick the button below to link it!"
+        keyboard = [[InlineKeyboardButton("🔗 Link Pulse Account", url=f"http://127.0.0.1:5000/link-telegram?chat_id={chat_id}")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        msg += "✅ *Account Linked!*\nYou are connected to your Pulse Cloud account.\n\nType /help to see full examples and settings (like /unlink)."
+        await update.message.reply_text(msg, parse_mode='Markdown')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show detailed help and examples."""
+    help_text = (
+        "💡 *Pulse Bot Commands*\n\n"
+        "✨ *Smart Tracker (Just type!)*\n"
+        "If you don't type a currency, your default currency will be used automatically!\n"
+        "• `Beli kopi 50k`\n"
+        "• `Grab to office 35000`\n"
+        "• `Netflix subscription 15 USD` (Overrides default currency)\n\n"
+        
+        "📊 *Reports & Insights*\n"
+        "• `/summary` - View current month's expenses & remaining budget\n"
+        "• `/insight` - View total expenses and income\n"
+        "• `/history` - See your 10 most recent transactions\n\n"
+        
+        "💰 *Income & Budget*\n"
+        "• `/add_income 5000000 Salary` - Add your monthly income\n"
+        "• `/set_budget Food 2000000` - Set a budget limit for a category\n"
+        "• `/clear_budget Food` - Remove a category budget limit\n\n"
+        
+        "🔄 *Recurring Transactions*\n"
+        "• `/recurring add 150000 Spotify 25` - Add 150k for Spotify on the 25th\n"
+        "• `/recurring list` - See all recurring rules\n"
+        "• `/recurring rm <id>` - Remove a recurring rule\n\n"
+        
+        "⚙️ *Settings*\n"
+        "• `/currency` - Set your default currency (e.g. `/currency IDR`)\n"
+        "• `/undo` - Delete the last expense you entered\n"
+        "• `/undo_income` - Delete the last income you entered\n"
+        "• `/unlink` - Unlink your Telegram account from Pulse\n"
+        "• `/help` - Show this message"
+    )
+    await update.message.reply_text(help_text, parse_mode='Markdown')
+
+async def unlink(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unlink Telegram account."""
+    chat_id = update.message.chat_id
+    user_id = get_user_id_from_chat(chat_id)
+    
+    if not user_id:
+        await update.message.reply_text("⚠️ Your account is not linked.")
+        return
+        
+    try:
+        # Delete from Supabase
+        supabase = get_supabase()
+        supabase.table('settings').delete().eq('key', 'telegram_chat_id').eq('value', str(chat_id)).execute()
+        
+        # Delete locally
+        conn = get_db(chat_id)
+        conn.execute("DELETE FROM settings WHERE key = 'telegram_chat_id'")
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(
+            "🔌 *Account Unlinked*\n\n"
+            "Your Telegram account has been disconnected from Pulse. "
+            "You can link it again anytime using /start.",
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to unlink account: {str(e)}")
+
+async def set_currency(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    user_id = get_user_id_from_chat(chat_id)
+    
+    if not user_id:
+        await update.message.reply_text("⚠️ Please /start and link your account first.")
+        return
+
+    if not context.args:
+        current_currency = get_user_currency(chat_id)
+        await update.message.reply_text(
+            f"🌍 Your current default currency is: *{current_currency.upper()}*\n\n"
+            f"To change it, use: `/currency <USD|IDR|EUR>`\n"
+            f"Example: `/currency IDR`",
+            parse_mode='Markdown'
+        )
+        return
+
+    new_curr = context.args[0].lower()
+    if new_curr not in BOT_CURRENCY_RATES:
+        await update.message.reply_text(f"❌ Unsupported currency. Supported: {', '.join(k.upper() for k in BOT_CURRENCY_RATES)}")
+        return
+
+    # Save locally
+    conn = get_db(chat_id)
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('default_currency', ?)", (new_curr,))
+    conn.commit()
+    conn.close()
+
+    # Save to Supabase (using Service Key)
+    try:
+        supabase = get_supabase()
+        supabase.table('settings').upsert({
+            'user_id': user_id,
+            'key': 'default_currency',
+            'value': new_curr
+        }).execute()
+    except Exception as e:
+        print(f"Failed to sync currency to Supabase: {e}")
+
+    await update.message.reply_text(
+        f"✅ Default currency updated to *{new_curr.upper()}*.\n"
+        f"You no longer need to type '{new_curr.upper()}' when adding expenses or incomes!",
+        parse_mode='Markdown'
+    )
 
 async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
     month, year = now.month, now.year
-    conn = get_db()
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
     cursor = conn.cursor()
 
     cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM income WHERE month=? AND year=?", (month, year))
@@ -172,7 +328,7 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     # Category Budgets Breakdown
-    conn = get_db()
+    conn = get_db(chat_id)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT e.category, SUM(e.amount) as total, b.amount as budget
@@ -199,7 +355,8 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def insight(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
     month, year = now.month, now.year
-    conn = get_db()
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
     cursor = conn.cursor()
 
     cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM income WHERE month=? AND year=?", (month, year))
@@ -248,7 +405,8 @@ async def add_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     tokens = context.args
-    amount_local, currency, description = parse_transaction_parts(tokens)
+    chat_id = update.message.chat_id
+    amount_local, currency, description = parse_transaction_parts(tokens, chat_id)
 
     if not amount_local:
         await update.message.reply_text("❌ Couldn't find or parse amount. Example: `/add eating 20k idr`", parse_mode='Markdown')
@@ -258,8 +416,23 @@ async def add_expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
     description = description if description else 'expense'
     category = guess_category(description)
     today = datetime.now().strftime('%Y-%m-%d')
+    chat_id = update.message.chat_id
 
-    conn = get_db()
+    # 1. Write to Supabase (Cloud)
+    try:
+        supabase = get_supabase()
+        supabase.table('expense').insert({
+            'amount': amount_usd,
+            'category': category,
+            'description': description,
+            'date': today,
+            'note': f"Added via bot ({amount_local:,.0f} {currency.upper()})"
+        }).execute()
+    except Exception as e:
+        print(f"Failed to sync to Supabase: {e}")
+
+    # 2. Write to Local DB (for instant bot feedback)
+    conn = get_db(chat_id)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO expense (amount, category, description, date, note) VALUES (?, ?, ?, ?, ?)",
@@ -311,7 +484,8 @@ async def add_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     tokens = context.args
-    amount_local, currency, source = parse_transaction_parts(tokens)
+    chat_id = update.message.chat_id
+    amount_local, currency, source = parse_transaction_parts(tokens, chat_id)
 
     if not amount_local:
         await update.message.reply_text("❌ Couldn't find or parse amount. Example: `/income salary 5m idr`", parse_mode='Markdown')
@@ -322,7 +496,21 @@ async def add_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
     month, year = now.month, now.year
 
-    conn = get_db()
+    # 1. Write to Supabase (Cloud)
+    try:
+        supabase = get_supabase()
+        supabase.table('income').insert({
+            'amount': amount_usd,
+            'source': source,
+            'month': month,
+            'year': year,
+            'note': f"Added via bot ({amount_local:,.0f} {currency.upper()})"
+        }).execute()
+    except Exception as e:
+        print(f"Failed to sync to Supabase: {e}")
+
+    # 2. Write to Local DB (for instant bot feedback)
+    conn = get_db(chat_id)
     cursor = conn.cursor()
     
     try:
@@ -351,9 +539,10 @@ async def add_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def clear_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
     month, year = now.month, now.year
+    chat_id = update.message.chat_id
     
     if not context.args:
-        conn = get_db()
+        conn = get_db(chat_id)
         cursor = conn.cursor()
         cursor.execute("SELECT category, amount FROM budget WHERE month = ? AND year = ?", (month, year))
         budgets = cursor.fetchall()
@@ -371,7 +560,7 @@ async def clear_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     category = context.args[0].lower()
-    conn = get_db()
+    conn = get_db(chat_id)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM budget WHERE category = ? AND month = ? AND year = ?", (category, month, year))
     conn.commit()
@@ -399,7 +588,8 @@ async def set_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount_usd = amount_local / rate
         
         now = datetime.now()
-        conn = get_db()
+        chat_id = update.message.chat_id
+        conn = get_db(chat_id)
         cursor = conn.cursor()
         cursor.execute(
             """INSERT INTO budget (category, amount, month, year) VALUES (?, ?, ?, ?)
@@ -420,24 +610,64 @@ async def set_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Failed to set budget: {str(e)}")
 
 async def undo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    conn = get_db()
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
     cursor = conn.cursor()
     # Get last transaction
-    cursor.execute("SELECT id, description, amount FROM expense ORDER BY id DESC LIMIT 1")
+    cursor.execute("SELECT id, description, amount, date FROM expense ORDER BY id DESC LIMIT 1")
     last = cursor.fetchone()
     
     if not last:
         await update.message.reply_text("Nothing to undo!")
+        conn.close()
         return
 
     cursor.execute("DELETE FROM expense WHERE id = ?", (last[0],))
     conn.commit()
     conn.close()
     
-    await update.message.reply_text(f"🗑️ *Transaction Deleted*\n`{last[1]}` - `${last[2]:.2f}`", parse_mode='Markdown')
+    # Try to delete from Supabase too
+    try:
+        supabase = get_supabase()
+        res = supabase.table('expense').select('id').eq('amount', last[2]).eq('description', last[1]).eq('date', last[3]).order('id', desc=True).limit(1).execute()
+        if res.data:
+            supabase.table('expense').delete().eq('id', res.data[0]['id']).execute()
+    except Exception as e:
+        print(f"Failed to undo expense from Supabase: {e}")
+        
+    await update.message.reply_text(f"🗑️ *Expense Deleted*\n`{last[1]}` - `${last[2]:.2f}`", parse_mode='Markdown')
+
+async def undo_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
+    cursor = conn.cursor()
+    # Get last income
+    cursor.execute("SELECT id, source, amount, month, year FROM income ORDER BY id DESC LIMIT 1")
+    last = cursor.fetchone()
+    
+    if not last:
+        await update.message.reply_text("No income to undo!")
+        conn.close()
+        return
+
+    cursor.execute("DELETE FROM income WHERE id = ?", (last[0],))
+    conn.commit()
+    conn.close()
+    
+    # Supabase undo
+    try:
+        supabase = get_supabase()
+        res = supabase.table('income').select('id').eq('amount', last[2]).eq('source', last[1]).eq('month', last[3]).eq('year', last[4]).order('id', desc=True).limit(1).execute()
+        if res.data:
+            supabase.table('income').delete().eq('id', res.data[0]['id']).execute()
+    except Exception as e:
+        print(f"Failed to undo income from Supabase: {e}")
+
+    await update.message.reply_text(f"🗑️ *Income Deleted*\n`{last[1]}` - `${last[2]:.2f}`", parse_mode='Markdown')
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    conn = get_db()
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
     cursor = conn.cursor()
     cursor.execute("SELECT date, description, amount, category FROM expense ORDER BY date DESC, id DESC LIMIT 10")
     rows = cursor.fetchall()
@@ -455,7 +685,8 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def recurring_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """List all recurring rules."""
-    conn = get_db()
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
     rows = conn.execute(
         "SELECT id, description, amount, category, day_of_month, is_active FROM recurring_config ORDER BY day_of_month"
     ).fetchall()
@@ -508,8 +739,9 @@ async def add_recurring(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     amount_usd = convert_to_usd(amount_local, currency)
     category = guess_category(description)
+    chat_id = update.message.chat_id
 
-    conn = get_db()
+    conn = get_db(chat_id)
     conn.execute(
         "INSERT INTO recurring_config (amount, category, description, day_of_month, is_active) VALUES (?,?,?,?,1)",
         (amount_usd, category, description, day)
@@ -533,7 +765,8 @@ async def del_recurring(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     rid = int(context.args[0])
-    conn = get_db()
+    chat_id = update.message.chat_id
+    conn = get_db(chat_id)
     row = conn.execute("SELECT description FROM recurring_config WHERE id=?", (rid,)).fetchone()
     if not row:
         await update.message.reply_text(f"❌ No rule with ID {rid}.")
@@ -560,9 +793,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tx_date = parsed.get('date') or date.today().isoformat()
         tx_type = parsed.get('tx_type', 'Bank Transaction')
         lang = parsed.get('lang', 'id')
+        chat_id = update.message.chat_id
 
         # Save directly as Draft
-        conn = get_db()
+        conn = get_db(chat_id)
         conn.execute(
             "INSERT INTO drafts (amount, description, date, category, source) VALUES (?,?,?,?,?)",
             (amount_usd, description, tx_date, category, f"telegram_bot ({tx_type})")
@@ -626,14 +860,19 @@ async def send_monthly_summary(context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("unlink", unlink))
+    app.add_handler(CommandHandler("currency", set_currency))
     app.add_handler(CommandHandler("summary", summary))
     app.add_handler(CommandHandler("insight", insight))
     app.add_handler(CommandHandler("add", add_expense))
     app.add_handler(CommandHandler("income", add_income))
+    app.add_handler(CommandHandler("add_income", add_income))
     app.add_handler(CommandHandler("wage", add_income))
     app.add_handler(CommandHandler("clearbudget", clear_budget))
     app.add_handler(CommandHandler("setbudget", set_budget))
     app.add_handler(CommandHandler("undo", undo))
+    app.add_handler(CommandHandler("undo_income", undo_income))
     app.add_handler(CommandHandler("history", history))
     # --- New: Recurring Manager ---
     app.add_handler(CommandHandler("recurring", recurring_list))
