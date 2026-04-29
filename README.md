@@ -29,15 +29,14 @@ Pulse features a bespoke animation system powered by **Anime.js**, designed to p
 
 ---
 
-## Hosting & Free Tier Limitations
+## Cloud-Synced Multi-User Architecture (New!)
 
-Pulse is designed to be highly interactive, especially with its **Telegram Bot (Pulsar)**. Running a bot 24/7 requires a continuous background process (polling).
+Pulse now uses a sophisticated **Dual-Write Architecture** combining lightning-fast local SQLite storage with highly available **Supabase** cloud persistence.
 
-> [!IMPORTANT]
-> **Why Local Setup is Recommended:**
-> Most free hosting providers (e.g., PythonAnywhere, Render, or Railway free tiers) often restrict long-running background tasks or outbound internet access, making it difficult to keep the Telegram bot alive 24/7 for free. 
-> 
-> For the best experience without costs, **running Pulse locally on your machine** or an always-on home server (like a Raspberry Pi) is the most reliable way to maintain your "financial rhythm."
+- **Supabase Cloud Sync**: Every transaction logged (via Web or Telegram) is instantly mirrored to your personal Supabase table.
+- **Telegram OAuth Linking**: Securely link your Telegram account to your Pulse Web account via a beautiful `/link-telegram` flow.
+- **True Multi-User Support**: Multiple users can chat with the same Telegram bot (`@pulsar_finance_bot`), and the bot will intelligently route their data to their isolated cloud account and local cache.
+- **Offline Resilience**: Bot responds instantly using local cache and syncs to Supabase seamlessly in the background.
 
 ---
 
@@ -48,6 +47,7 @@ Follow these steps to get Pulse running on your own computer:
 ### 1. Prerequisites
 - **Python 3.10+** installed.
 - A **Telegram Bot Token** (Get it from [@BotFather](https://t.me/botfather)).
+- A **Supabase Account** with Auth and Database configured.
 
 ### 2. Installation
 1.  **Clone the repository** to your local machine.
@@ -60,7 +60,9 @@ Follow these steps to get Pulse running on your own computer:
 Create a file named `.env` in the root directory and add your credentials:
 ```env
 TELEGRAM_BOT_TOKEN=your_token_here
-TELEGRAM_CHAT_ID=your_personal_chat_id # Optional for auto-summaries
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 ```
 
 ### 4. Database Initialization
@@ -101,13 +103,25 @@ python bot.py
 
 ## Telegram Bot (Pulsar) Commands
 
-- `/start` - Introduction and help.
-- `/add [desc] [amount] [currency]` - Quick log (e.g., `/add coffee 5 usd`).
+**✨ Smart Tracker**
+- `Beli kopi 50k` *(Automatically uses your default currency)*
+- `Netflix subscription 15 USD` *(Overrides default currency)*
+
+**💰 Income & Budget**
+- `/add_income 5000000 Salary` - Log a new income source.
+- `/set_budget Food 2000000` - Set a monthly spending target.
+- `/clear_budget Food` - Remove a category budget.
+
+**⚙️ Settings & Sync**
+- `/currency` - Change your default currency (e.g., `/currency IDR`).
+- `/undo` - Delete your very last expense from both Local DB and Supabase.
+- `/undo_income` - Delete your very last income from both Local DB and Supabase.
+- `/unlink` - Securely disconnect your Telegram account from Pulse.
+
+**📊 Insights**
 - `/summary` - Monthly financial overview with budget progress bars.
-- `/history` - View the last 10 transactions.
-- `/undo` - Remove the very last transaction added.
-- `/setbudget [category] [amount] [currency]` - Set a monthly spending target.
 - `/insight` - Real-time Pulse Intelligence report.
+- `/history` - View the last 10 transactions.
 
 ---
 *Created by Jsooonx for Portfolio | 2026*

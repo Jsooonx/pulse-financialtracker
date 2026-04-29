@@ -834,29 +834,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
 
-async def send_monthly_summary(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = os.getenv('TELEGRAM_CHAT_ID')
-    if not chat_id:
-        return
-    now = datetime.now()
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM income WHERE month=? AND year=?", (now.month, now.year))
-    income = cursor.fetchone()[0]
-    cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM expense WHERE strftime('%m', date)=? AND strftime('%Y', date)=?",
-                   (str(now.month).zfill(2), str(now.year)))
-    expenses = cursor.fetchone()[0]
-    conn.close()
-    balance = income - expenses
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"📅 *Monthly Wrap-up - {now.strftime('%B %Y')}*\n\n"
-             f"💰 Income: `${income:,.2f}`\n"
-             f"💸 Expenses: `${expenses:,.2f}`\n"
-             f"✅ Balance: `${balance:,.2f}`",
-        parse_mode='Markdown'
-    )
-
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
