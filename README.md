@@ -10,7 +10,8 @@ Pulse is a proactive personal finance application that goes beyond passive track
 ![SQLite](https://img.shields.io/badge/SQLite-3.41-blue?style=flat-square)
 ![Chart.js](https://img.shields.io/badge/Chart.js-4.4-blue?style=flat-square)
 
-**🌍 Live Demo:** [https://pulse-financialtracker-production.up.railway.app/](https://pulse-financialtracker-production.up.railway.app/)
+**🌍 Live Demo:** [https://pulse-financialtracker.vercel.app/](https://pulse-financialtracker.vercel.app/)
+
 
 ---
 

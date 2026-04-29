@@ -190,7 +190,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not user_id:
         msg += "⚠️ *NOT LINKED:*\nYour Telegram is not linked to your Pulse Cloud account.\nClick the button below to link it!"
-        base_url = os.getenv('WEB_APP_URL', 'http://127.0.0.1:5000').rstrip('/')
+        
+        # Smart detection of base URL
+        base_url = os.getenv('WEB_APP_URL')
+        if not base_url or '127.0.0.1' in base_url or 'localhost' in base_url:
+            # If not set or pointing to local, try to use a default or let it be handled by context
+            base_url = "https://pulse-financialtracker.vercel.app" # Hardcoded safe fallback for your project
+            
+        base_url = base_url.rstrip('/')
         keyboard = [[InlineKeyboardButton("🔗 Link Pulse Account", url=f"{base_url}/link-telegram?chat_id={chat_id}")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(msg, parse_mode='Markdown', reply_markup=reply_markup)
