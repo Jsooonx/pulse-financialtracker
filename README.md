@@ -43,12 +43,13 @@ Pulse now uses a sophisticated **Dual-Write Architecture** combining lightning-f
 
 ### Production Infrastructure
 
-Pulse is architected for maximum availability and zero-cost maintenance in a production environment:
+Pulse is architected for maximum availability and high-performance response times via a **Hybrid Deployment Strategy**:
 
-- **Serverless Web Hosting (Vercel)**: The Flask dashboard is deployed as a Serverless Function, ensuring infinite scalability and free, high-performance hosting.
-- **Bot Webhooks (Polling-Free)**: Unlike traditional polling bots, Pulse uses **Telegram Webhooks**. This allows the bot to run on the same serverless instance as the web app, responding instantly to incoming messages without requiring a 24/7 background process.
-- **Ephemeral Storage with Cloud Rehydration**: The application uses `/tmp` for lightning-fast SQLite operations. Since serverless storage is ephemeral, Pulse automatically re-hydrates the local database from **Supabase** whenever the instance starts ("Cold Start"), ensuring 100% data persistence.
-- **Uptime Keep-Alive**: To eliminate cold-start latency for the Telegram bot, the instance is kept "warm" via periodic pings from **UptimeRobot**, providing a near-instant response time 24/7.
+- **Web Dashboard (Vercel Serverless)**: The Flask frontend is hosted on Vercel, ensuring global scalability, zero maintenance, and high availability for the digital editorial experience.
+- **24/7 Telegram Bot (AlwaysData Service)**: The Telegram bot (`bot.py`) runs as a persistent background service on **AlwaysData**. This eliminates cold-start latency entirely, providing near-instant responses to every message.
+- **Polling-based Architecture**: By moving to a persistent host, the bot now uses robust **Long Polling**, which is more resilient than webhooks and avoids the network restrictions often found in serverless environments.
+- **Dual-Write Synchronization**: All transactions are written locally to AlwaysData's persistent storage for speed, then instantly mirrored to **Supabase Cloud** to ensure the Vercel dashboard is always up-to-date.
+
 
 ---
 
