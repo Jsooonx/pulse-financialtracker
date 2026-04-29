@@ -1430,6 +1430,18 @@ async def set_webhook():
     except Exception as e:
         return f"❌ Error: {str(e)}", 500
 
+@app.route('/unset_webhook', methods=['GET'])
+async def unset_webhook():
+    """One-time route to remove the webhook URL (use this when moving to Koyeb/Polling)."""
+    try:
+        success = await bot_app.bot.delete_webhook()
+        if success:
+            return "✅ Webhook successfully deleted. You can now use Polling (Koyeb)!", 200
+        return "❌ Failed to delete webhook", 400
+    except Exception as e:
+        return f"❌ Error: {str(e)}", 500
+
+
 if __name__ == "__main__":
     app.run(debug=True)
 
