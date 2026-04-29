@@ -74,23 +74,34 @@ def get_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_user_id_from_chat(chat_id):
-    """Scan local user DBs to find which one has this Telegram chat_id linked."""
-    if not os.path.exists(USER_DBS_DIR):
-        return None
+    """Find which user_id has this Telegram chat_id linked (checking local then Supabase)."""
+    # 1. Check local DBs first (fastest)
+    if os.path.exists(USER_DBS_DIR):
+        for filename in os.listdir(USER_DBS_DIR):
+            if filename.startswith('pulse_') and filename.endswith('.db'):
+                db_path = os.path.join(USER_DBS_DIR, filename)
+                try:
+                    conn = sqlite3.connect(db_path)
+                    row = conn.execute("SELECT value FROM settings WHERE key='telegram_chat_id'").fetchone()
+                    conn.close()
+                    if row and str(row[0]) == str(chat_id):
+                        return filename[6:-3]
+                except:
+                    continue
+    
+    # 2. Fallback: Ask Supabase (Cloud)
+    try:
+        supabase = get_supabase()
+        response = supabase.table('settings').select('user_id').eq('key', 'telegram_chat_id').eq('value', str(chat_id)).execute()
+        if response.data:
+            user_id = response.data[0]['user_id']
+            # Optional: You could trigger a sync here if you want to be extra sure
+            return user_id
+    except Exception as e:
+        print(f"Supabase lookup error: {e}")
         
-    for filename in os.listdir(USER_DBS_DIR):
-        if filename.startswith('pulse_') and filename.endswith('.db'):
-            db_path = os.path.join(USER_DBS_DIR, filename)
-            try:
-                conn = sqlite3.connect(db_path)
-                row = conn.execute("SELECT value FROM settings WHERE key='telegram_chat_id'").fetchone()
-                conn.close()
-                if row and str(row[0]) == str(chat_id):
-                    # extract user_id from pulse_<user_id>.db
-                    return filename[6:-3]
-            except:
-                continue
     return None
+
 
 def init_user_db(conn):
     """Ensure all required tables exist in the user's database."""
