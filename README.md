@@ -41,6 +41,15 @@ Pulse now uses a sophisticated **Dual-Write Architecture** combining lightning-f
 - **True Multi-User Support**: Multiple users can chat with the same Telegram bot (`@pulsar_finance_bot`), and the bot will intelligently route their data to their isolated cloud account and local cache.
 - **Offline Resilience**: Bot responds instantly using local cache and syncs to Supabase seamlessly in the background.
 
+### Production Infrastructure
+
+Pulse is architected for maximum availability and zero-cost maintenance in a production environment:
+
+- **Serverless Web Hosting (Vercel)**: The Flask dashboard is deployed as a Serverless Function, ensuring infinite scalability and free, high-performance hosting.
+- **Bot Webhooks (Polling-Free)**: Unlike traditional polling bots, Pulse uses **Telegram Webhooks**. This allows the bot to run on the same serverless instance as the web app, responding instantly to incoming messages without requiring a 24/7 background process.
+- **Ephemeral Storage with Cloud Rehydration**: The application uses `/tmp` for lightning-fast SQLite operations. Since serverless storage is ephemeral, Pulse automatically re-hydrates the local database from **Supabase** whenever the instance starts ("Cold Start"), ensuring 100% data persistence.
+- **Uptime Keep-Alive**: To eliminate cold-start latency for the Telegram bot, the instance is kept "warm" via periodic pings from **UptimeRobot**, providing a near-instant response time 24/7.
+
 ---
 
 ## Local Setup Guide
@@ -106,22 +115,22 @@ python bot.py
 
 ## Telegram Bot (Pulsar) Commands
 
-**✨ Smart Tracker**
+**Smart Tracker**
 - `Beli kopi 50k` *(Automatically uses your default currency)*
 - `Netflix subscription 15 USD` *(Overrides default currency)*
 
-**💰 Income & Budget**
+**Income & Budget**
 - `/add_income 5000000 Salary` - Log a new income source.
 - `/set_budget Food 2000000` - Set a monthly spending target.
 - `/clear_budget Food` - Remove a category budget.
 
-**⚙️ Settings & Sync**
+**Settings & Sync**
 - `/currency` - Change your default currency (e.g., `/currency IDR`).
 - `/undo` - Delete your very last expense from both Local DB and Supabase.
 - `/undo_income` - Delete your very last income from both Local DB and Supabase.
 - `/unlink` - Securely disconnect your Telegram account from Pulse.
 
-**📊 Insights**
+**Insights**
 - `/summary` - Monthly financial overview with budget progress bars.
 - `/insight` - Real-time Pulse Intelligence report.
 - `/history` - View the last 10 transactions.
